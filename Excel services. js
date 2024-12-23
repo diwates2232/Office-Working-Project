@@ -217,3 +217,115 @@ loadExcelData();
 
 // Export all functions
 module.exports = { fetchRegionData, fetchGlobalData };
+
+
+
+//3
+
+const xlsx = require("xlsx");
+const path = require("path");
+const ping = require("ping");
+
+// Paths for Excel files
+const archiverPath = path.join(__dirname, "../data/ArchiverData.xlsx");
+const controllerPath = path.join(__dirname, "../data/ControllerData.xlsx");
+const cameraPath = path.join(__dirname, "../data/CameraData.xlsx");
+const serverPath = path.join(__dirname, "../data/ServerData.xlsx");
+
+// Cache to store preloaded data
+let allData = {};
+
+// Function to normalize column headers
+const normalizeHeaders = (data) => {
+    return data.map((row) => {
+        const normalizedRow = {};
+        for (const key in row) {
+            const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+            normalizedRow[normalizedKey] = row[key];
+        }
+        return normalizedRow;
+    });
+};
+
+// Function to load Excel data into memory
+const loadExcelData = () => {
+    const archiverWorkbook = xlsx.readFile(archiverPath);
+    const controllerWorkbook = xlsx.readFile(controllerPath);
+    const cameraWorkbook = xlsx.readFile(cameraPath);
+    const serverWorkbook = xlsx.readFile(serverPath);
+
+    const archiverData = normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]]));
+    const controllerData = normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]]));
+    const cameraData = normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]]));
+    const serverData = normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]]));
+
+    allData = {
+        archivers: archiverData,
+        controllers: controllerData,
+        cameras: cameraData,
+        servers: serverData,
+    };
+};
+
+// Function to fetch global summary
+const fetchGlobalData = async () => {
+    const totalDevices = [...allData.archivers, ...allData.controllers, ...allData.cameras, ...allData.servers];
+    await pingDevices(totalDevices);
+
+    const onlineDevices = totalDevices.filter((device) => device.status === "Online").length;
+    const offlineDevices = totalDevices.filter((device) => device.status === "Offline").length;
+
+    return {
+        total: totalDevices.length,
+        online: onlineDevices,
+        offline: offlineDevices,
+    };
+};
+
+// Function to fetch region summary
+const fetchRegionData = async (regionName) => {
+    const regionArchivers = allData.archivers.filter((row) => row.location?.toLowerCase() === regionName.toLowerCase());
+    const regionControllers = allData.controllers.filter((row) => row.location?.toLowerCase() === regionName.toLowerCase());
+    const regionCameras = allData.cameras.filter((row) => row.location?.toLowerCase() === regionName.toLowerCase());
+    const regionServers = allData.servers.filter((row) => row.location?.toLowerCase() === regionName.toLowerCase());
+
+    const devices = [...regionArchivers, ...regionControllers, ...regionCameras, ...regionServers];
+    await pingDevices(devices);
+
+    const onlineDevices = devices.filter((device) => device.status === "Online").length;
+    const offlineDevices = devices.filter((device) => device.status === "Offline").length;
+
+    return {
+        total: devices.length,
+        online: onlineDevices,
+        offline: offlineDevices,
+    };
+};
+
+// Function to ping devices
+const pingDevices = async (devices) => {
+    const pingPromises = devices.map(async (device) => {
+        const ipAddress = device.ip_address;
+        if (ipAddress) {
+            device.status = await pingDevice(ipAddress);
+        } else {
+            device.status = "IP Address Missing";
+        }
+    });
+
+    await Promise.all(pingPromises);
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Preload data
+loadExcelData();
+
+module.exports = { fetchGlobalData, fetchRegionData };
