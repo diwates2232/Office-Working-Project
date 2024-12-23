@@ -1,10 +1,32 @@
-const { fetchRegionData, fetchGlobalSummary } = require("../services/excelService");
+const { fetchRegionData, fetchGlobalData } = require("../services/excelService");
 
-// Controller to handle global summary
+// Controller to handle region data request
+const getRegionDetails = async (req, res) => {
+    const { regionName } = req.params;
+
+    try {
+        const regionData = await fetchRegionData(regionName);
+
+        if (!regionData) {
+            return res.status(404).json({ error: "Region not found" });
+        }
+
+        res.status(200).json(regionData);
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Controller to handle global summary request
 const getGlobalSummary = async (req, res) => {
     try {
-        const summary = await fetchGlobalSummary();
-        res.status(200).json(summary);
+        const globalData = await fetchGlobalData();
+
+        if (!globalData) {
+            return res.status(404).json({ error: "Global data not found" });
+        }
+
+        res.status(200).json(globalData);
     } catch (error) {
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
