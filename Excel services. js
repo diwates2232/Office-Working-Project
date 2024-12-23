@@ -93,3 +93,127 @@ const pingDevice = (ip) => {
 loadExcelData();
 
 module.exports = { fetchRegionData };
+
+
+
+
+update 
+
+
+const xlsx = require("xlsx");
+const path = require("path");
+const ping = require("ping");
+
+// Paths for Excel files
+const archiverPath = path.join(__dirname, "../data/ArchiverData.xlsx");
+const controllerPath = path.join(__dirname, "../data/ControllerData.xlsx");
+const cameraPath = path.join(__dirname, "../data/CameraData.xlsx");
+const serverPath = path.join(__dirname, "../data/ServerData.xlsx");
+
+// Cache to store preloaded data
+let allData = {};
+
+// Function to normalize column headers
+const normalizeHeaders = (data) => {
+    return data.map((row) => {
+        const normalizedRow = {};
+        for (const key in row) {
+            const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_'); // Replace spaces with underscores
+            normalizedRow[normalizedKey] = row[key];
+        }
+        return normalizedRow;
+    });
+};
+
+// Function to load Excel data into memory
+const loadExcelData = () => {
+    // Read Excel files
+    const archiverWorkbook = xlsx.readFile(archiverPath);
+    const controllerWorkbook = xlsx.readFile(controllerPath);
+    const cameraWorkbook = xlsx.readFile(cameraPath);
+    const serverWorkbook = xlsx.readFile(serverPath);
+
+    // Convert sheets to JSON and normalize headers
+    const archiverData = normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]]));
+    const controllerData = normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]]));
+    const cameraData = normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]]));
+    const serverData = normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]]));
+
+    // Store all data in memory
+    allData = {
+        archivers: archiverData,
+        controllers: controllerData,
+        cameras: cameraData,
+        servers: serverData,
+    };
+};
+
+// Function to fetch data by region name
+const fetchRegionData = async (regionName) => {
+    // Filter data for the requested region
+    const regionArchivers = allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase());
+    const regionControllers = allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase());
+    const regionCameras = allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase());
+    const regionServers = allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase());
+
+    // Ping devices to check their status
+    const devices = [...regionArchivers, ...regionControllers, ...regionCameras, ...regionServers];
+    await pingDevices(devices);
+
+    return {
+        archivers: regionArchivers,
+        controllers: regionControllers,
+        cameras: regionCameras,
+        servers: regionServers,
+    };
+};
+
+// Function to fetch global data
+const fetchGlobalData = async () => {
+    // Ensure all data is available in memory
+    if (!allData.archivers || !allData.controllers || !allData.cameras || !allData.servers) {
+        throw new Error("Data not loaded properly");
+    }
+
+    // Calculate total counts
+    const totalArchivers = allData.archivers.length;
+    const totalControllers = allData.controllers.length;
+    const totalCameras = allData.cameras.length;
+    const totalServers = allData.servers.length;
+
+    return {
+        totalArchivers,
+        totalControllers,
+        totalCameras,
+        totalServers,
+    };
+};
+
+// Function to ping devices in parallel
+const pingDevices = async (devices) => {
+    const pingPromises = devices.map(async (device) => {
+        const ipAddress = device.ip_address; // Assuming IP address is stored under `ip_address`
+        if (ipAddress) {
+            device.status = await pingDevice(ipAddress);
+        } else {
+            device.status = "IP Address Missing";
+        }
+    });
+
+    await Promise.all(pingPromises); // Parallelize all ping operations
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Preload data when the server starts
+loadExcelData();
+
+// Export all functions
+module.exports = { fetchRegionData, fetchGlobalData };
