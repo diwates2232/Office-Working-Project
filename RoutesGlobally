@@ -32,3 +32,24 @@ router.get("/region-summary/:region", getRegionSummary);
 router.get("/region-details/:region", getRegionDetails);
 
 module.exports = router;
+
+
+
+4
+
+new 
+
+
+const express = require("express");
+const { getGlobalData, getRegionData } = require("../controllers/regionControllers");
+
+const router = express.Router();
+
+// Route for Global Summary and Details
+router.get("/summary", getGlobalData);
+
+// Route for Region Summary and Details
+router.get("/summary/:regionName", getRegionData);
+
+module.exports = router;
+
