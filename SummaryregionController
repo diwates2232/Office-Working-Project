@@ -81,3 +81,34 @@ const getRegionDetails = async (req, res) => {
 };
 
 module.exports = { getGlobalSummary, getRegionSummary, getRegionDetails };
+
+
+
+4 new
+
+
+
+const { fetchGlobalData, fetchRegionData } = require("../services/excelService");
+
+// Global summary and details controller
+const getGlobalData = async (req, res) => {
+    try {
+        const globalData = await fetchGlobalData();
+        res.status(200).json(globalData);
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Region summary and details controller
+const getRegionData = async (req, res) => {
+    const { regionName } = req.params;
+    try {
+        const regionData = await fetchRegionData(regionName);
+        res.status(200).json(regionData);
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+module.exports = { getGlobalData, getRegionData };
