@@ -6,10 +6,49 @@
     <title>Region Details</title>
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
+    <style>
+        /* Added CSS for sticky region section */
+        .regions {
+            position: sticky;
+            top: 0;
+            background-color: black;
+            z-index: 1000;
+            padding: 10px 0;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .region-button {
+            margin:5px;
+            margin-top:2px;
+            margin-bottom: 2px;
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .detail-section {
+            margin-top: 20px;
+            margin-bottom: 100px;
+            text-align: start;
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            text-wrap: wrap;
+        
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 14px;
+        }
+
+        .footer-logo {
+            height: 50px;
+        }
+    </style>
 </head>
 <body>
     <header>
-        <h1>Region Monitoring Dashboard</h1>
+        <h1>WU VisionWatch Dashboard</h1>
     </header>
 
     <main>
@@ -24,23 +63,18 @@
             <div id="controllers" class="detail-section">
                 <h2>Controller Details</h2>
                 <div id="controllers-list">Click a region to load data</div>
-
-
-                <P class="status"><Status:Offline></P>
-
             </div>
 
             <div id="archivers" class="detail-section">
                 <h2>Archiver Details</h2>
                 <div id="archivers-list">Click a region to load data</div>
             </div>
-        </section>
-    </main>
+
 
     <!--Include Footer-->
     <footer class="footer">
         <img src="images/FooterLogo.png" alt="Company Logo" class="footer-logo">
-        <p>&copy;2024 VisionWatch | Power by <strong>Western Union Servcies India Pvt Ltd.</strong></p>
+        <p>&copy;2024 VisionWatch | Powered by <strong>Western Union Services India Pvt Ltd.</strong></p>
         <p>Contact :
         <a href="mailto:gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com">gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com</a> |
         <a href="tel:+91 20 67632394">+91 2067632394 </a>
