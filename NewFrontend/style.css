@@ -15,6 +15,7 @@ body{
 header {
     text-align: center;
     background-color: #004aad;
+    font-family: 'Times New Roman', Times, serif;
     color: white;
     padding: 15px;
 }
@@ -51,6 +52,8 @@ main {
     font-weight: bold;
     border: 2px solid rgba(0, 0, 0, 0.888);
     border-radius: 8px;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: larger;
     
 }
 
@@ -81,15 +84,17 @@ main {
     text-align: center;
     margin-bottom: 10px;
 }
-
 .status{
     font-weight: bold; /* Default color for Online*/
     color: green;
 }
 .status.offline{
     color: red; /* Default color for Offline*/
+    
 
 }
+
+
 
 ul {
     list-style-type: none;
