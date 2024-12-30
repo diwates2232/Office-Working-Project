@@ -18,3 +18,6 @@ npm list react react-dom react-chartjs-2
 
 
 npm list react react-dom react-chartjs-2
+
+
+npm install react-router-dom axios react-chartjs-2 chart.js
