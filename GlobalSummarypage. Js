@@ -1,0 +1,40 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Bar } from 'react-chartjs-2';
+
+const GlobalSummaryPage = () => {
+  const [globalSummary, setGlobalSummary] = useState(null);
+
+  useEffect(() => {
+    axios.get('/api/regions/global-summary')
+      .then(response => setGlobalSummary(response.data))
+      .catch(error => console.error('Error fetching global summary:', error));
+  }, []);
+
+  if (!globalSummary) return <p>Loading Global Summary...</p>;
+
+  const chartData = {
+    labels: ['Devices', 'Cameras', 'Archivers', 'Servers'],
+    datasets: [
+      {
+        label: 'Online',
+        data: [globalSummary.totalOnlineDevices, globalSummary.totalOnlineCameras, globalSummary.totalOnlineArchivers, globalSummary.totalOnlineServers],
+        backgroundColor: 'rgba(75,192,192,1)',
+      },
+      {
+        label: 'Offline',
+        data: [globalSummary.totalOfflineDevices, globalSummary.totalOfflineCameras, globalSummary.totalOfflineArchivers, globalSummary.totalOfflineServers],
+        backgroundColor: 'rgba(255,99,132,1)',
+      },
+    ],
+  };
+
+  return (
+    <div>
+      <h1>Global Summary</h1>
+      <Bar data={chartData} />
+    </div>
+  );
+};
+
+export default GlobalSummaryPage;
