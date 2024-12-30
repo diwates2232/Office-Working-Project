@@ -24,3 +24,6 @@ npm install react-router-dom axios react-chartjs-2 chart.js
 
 
 rm -rf node_modules package-lock.json
+
+Remove-Item -Recurse -Force node_modules
+Remove-Item -Force package-lock.json
