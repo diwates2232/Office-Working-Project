@@ -72,3 +72,54 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("LACA").addEventListener("click", () => fetchRegionData("LACA"));
     document.getElementById("NAMER").addEventListener("click", () => fetchRegionData("NAMER"));
 });
+
+
+
+
+new 
+
+
+
+
+
+    // Function to fetch region summary data
+function fetchGlobalSummary() {
+    document.getElementById("global-summary-text").innerHTML = "Fetching global data...";
+    fetch("http://localhost:3000/api/global-summary")
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("global-summary-text").innerHTML = `
+                <p>Total Controllers: ${data.totalControllers}</p>
+                <p>Total Archivers: ${data.totalArchivers}</p>
+            `;
+        })
+        .catch(error => {
+            document.getElementById("global-summary-text").innerHTML = `<p>Error: ${error.message}</p>`;
+        });
+}
+
+// Function to fetch region-specific summary data
+function fetchRegionSummary(regionName) {
+    fetch(`http://localhost:3000/api/regions/${regionName}/summary`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById(`${regionName}-summary`).innerHTML = `
+                <p>Controllers Online: ${data.controllersOnline}</p>
+                <p>Archivers Online: ${data.archiversOnline}</p>
+            `;
+        })
+        .catch(error => {
+            document.getElementById(`${regionName}-summary`).innerHTML = `<p>Error: ${error.message}</p>`;
+        });
+}
+
+// Attach event listeners to region summary buttons
+document.addEventListener("DOMContentLoaded", () => {
+    fetchGlobalSummary(); // Load global summary when page loads
+
+    // Fetch region summaries on button click
+    document.getElementById("APAC-summary").addEventListener("click", () => fetchRegionSummary("APAC"));
+    document.getElementById("EMEA-summary").addEventListener("click", () => fetchRegionSummary("EMEA"));
+    document.getElementById("LACA-summary").addEventListener("click", () => fetchRegionSummary("LACA"));
+    document.getElementById("NAMER-summary").addEventListener("click", () => fetchRegionSummary("NAMER"));
+});
