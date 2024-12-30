@@ -53,3 +53,29 @@ router.get("/summary/:regionName", getRegionData);
 
 module.exports = router;
 
+
+
+
+5
+
+const express = require("express");
+const {
+    getGlobalSummary,
+    getGlobalDetails,
+    getRegionSummary,
+    getRegionDetails,
+} = require("../controllers/regionControllers");
+
+const router = express.Router();
+
+// Routes for Global Data
+router.get("/summary/global", getGlobalSummary); // Global summary
+router.get("/details/global", getGlobalDetails); // Global details
+
+// Routes for Region Data
+router.get("/summary/:regionName", getRegionSummary); // Region summary
+router.get("/details/:regionName", getRegionDetails); // Region details
+
+module.exports = router;
+
+
