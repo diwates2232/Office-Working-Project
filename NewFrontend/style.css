@@ -141,3 +141,119 @@ li:last-child {
 .footer strong{
     color: #ffcc00;
 }
+
+
+
+
+
+
+
+new 
+
+
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    background-image: url('../images/black.jpg');
+    background-size: 1800px 850px;
+    background-position: center;
+    background-repeat: repeat;
+    height: 100vh;
+    color: #ffffff;
+}
+
+header {
+    text-align: center;
+    background-color: #004aad;
+    font-family: 'Times New Roman', Times, serif;
+    color: white;
+    padding: 15px;
+}
+
+main {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 20px;
+}
+
+/* Summary Section */
+.summary {
+    display: flex;
+    justify-content: space-between;
+    flex: 2;
+    gap: 20px;
+}
+
+.global-summary, .region-summary {
+    flex: 1;
+    background-color: #ffffff;
+    color: black;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.summary h2 {
+    color: #004aad;
+    text-align: center;
+}
+
+.summary-button {
+    padding: 10px 20px;
+    margin: 10px;
+    background-color: #0059ff;
+    color: white;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: transform 0.3s;
+}
+
+.summary-button:hover {
+    background-color: #ffd700;
+    transform: scale(1.1);
+}
+
+/* Sidebar for Region Details */
+.sidebar {
+    flex: 3;
+    background-color: white;
+    color: black;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+}
+
+.detail-section {
+    margin-bottom: 20px;
+}
+
+.footer {
+    text-align: center;
+    padding: 15px;
+    background-color: #222;
+    color: #fff;
+    font-size: 14px;
+    width: 100%;
+    position: fixed;
+    bottom: 0;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.footer-logo {
+    height: 40px;
+    display: block;
+    margin: 0 auto 10px;
+}
+
+.footer a {
+    color: #ffcc00;
+    text-decoration: underline;
+}
+
+
+
