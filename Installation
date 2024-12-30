@@ -1,1 +1,20 @@
-npm install react-router-dom axios chart.js react-chartjs-2 bootstrap @mui/material @emotion/react @emotion/styled
+
+npm install react@18.3.0 react-dom@18.3.0 --force
+
+
+npm install react-router-dom axios chart.js react-chartjs-2 bootstrap @mui/material @emotion/react @emotion/styled --force
+
+
+
+
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install
+
+
+npm list react react-dom react-chartjs-2
+
+
+
+
+npm list react react-dom react-chartjs-2
