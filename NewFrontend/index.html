@@ -159,3 +159,75 @@ new
     </footer>
 </body>
 </html>       
+
+
+
+
+
+
+
+
+            <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WU VisionWatch Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>WU VisionWatch Dashboard</h1>
+  </header>
+
+  <main>
+    <!-- Global Summary Section -->
+    <section id="global-summary">
+      <h2>Global Summary</h2>
+      <div class="summary-card">
+        <p>Total Servers: <span id="total-servers">0</span></p>
+        <p>Total Controllers: <span id="total-controllers">0</span></p>
+        <p>Total Archivers: <span id="total-archivers">0</span></p>
+        <p>Total Cameras: <span id="total-cameras">0</span></p>
+      </div>
+    </section>
+
+    <!-- Region-Wise Summary -->
+    <section id="region-summary">
+      <h2>Region-Wise Summary</h2>
+      <div id="region-cards">
+        <!-- Dynamic cards for each region will be populated here -->
+      </div>
+    </section>
+
+    <!-- Sidebar for Region Details -->
+    <aside id="sidebar">
+      <h3>Region Details</h3>
+      <div id="region-buttons">
+        <button class="region-btn" data-region="APAC">APAC</button>
+        <button class="region-btn" data-region="EMEA">EMEA</button>
+        <button class="region-btn" data-region="LACA">LACA</button>
+        <button class="region-btn" data-region="NAMER">NAMER</button>
+      </div>
+    </aside>
+
+    <!-- Detailed Information Section -->
+    <section id="region-details">
+      <h2>Region Details</h2>
+      <div id="details-container">
+        <h3 id="region-title">Select a region to view details</h3>
+        <div id="details">
+          <!-- Dynamic region details will be displayed here -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2024 VisionWatch | Powered by Western Union Services India Pvt Ltd.</p>
+    <p>Contact: gsoc-globalsecurityoperationcenter@westerunion.com</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
