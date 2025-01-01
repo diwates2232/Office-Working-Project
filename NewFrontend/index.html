@@ -88,32 +88,38 @@
 
 new 
 
+
+
             
 
-<!DOCTYPE html>
+     <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Region Details</title>
+    <title>VisionWatch Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
-    <style>
-        /* Add styles here */
-    </style>
 </head>
 <body>
+    <!-- Header -->
     <header>
         <h1>WU VisionWatch Dashboard</h1>
     </header>
 
+    <!-- Main Content -->
     <main>
-        <!-- Main Summary Section -->
+        <!-- Global and Region Summary Section -->
         <section class="summary">
+            <!-- Global Summary -->
             <div class="global-summary">
                 <h2>Global Summary</h2>
-                <p id="global-summary-text">Fetching global data...</p>
+                <div id="global-summary-content">
+                    <p>Loading global data...</p>
+                </div>
             </div>
+
+            <!-- Region Summary -->
             <div class="region-summary">
                 <h2>Region-Wise Summary</h2>
                 <div class="region-summary-buttons">
@@ -121,6 +127,9 @@ new
                     <button id="EMEA-summary" class="summary-button">EMEA</button>
                     <button id="LACA-summary" class="summary-button">LACA</button>
                     <button id="NAMER-summary" class="summary-button">NAMER</button>
+                </div>
+                <div id="region-summary-content">
+                    <p>Select a region to see the summary.</p>
                 </div>
             </div>
         </section>
@@ -137,17 +146,16 @@ new
                 <div id="archivers-list">Click a region to load data</div>
             </div>
         </aside>
-
-        <!-- Include Footer -->
-        <footer class="footer">
-            <img src="images/FooterLogo.png" alt="Company Logo" class="footer-logo">
-            <p>&copy;2024 VisionWatch | Powered by <strong>Western Union Services India Pvt Ltd.</strong></p>
-            <p>Contact: 
-                <a href="mailto:gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com">gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com</a> |
-                <a href="tel:+91 20 67632394">+91 2067632394 </a>
-            </p>
-        </footer>
     </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <img src="images/FooterLogo.png" alt="Company Logo" class="footer-logo">
+        <p>&copy;2024 VisionWatch | Powered by <strong>Western Union Services India Pvt Ltd.</strong></p>
+        <p>Contact: 
+            <a href="mailto:gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com">gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com</a> |
+            <a href="tel:+91 20 67632394">+91 2067632394</a>
+        </p>
+    </footer>
 </body>
-</html>
-            
+</html>       
