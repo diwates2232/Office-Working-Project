@@ -179,4 +179,46 @@ module.exports = {
 // inprove time
 
 
+const excelService = require("../services/excelService");
 
+// Global Summary
+exports.getGlobalSummary = async (req, res) => {
+  try {
+    const data = await excelService.fetchGlobalSummary();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+};
+
+// Global Details
+exports.getGlobalDetails = async (req, res) => {
+  try {
+    const data = await excelService.fetchGlobalDetails();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+};
+
+// Region Summary
+exports.getRegionSummary = async (req, res) => {
+  const { regionName } = req.params;
+  try {
+    const data = await excelService.fetchRegionSummary(regionName);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+};
+
+// Region Details
+exports.getRegionDetails = async (req, res) => {
+  const { regionName } = req.params;
+  try {
+    const data = await excelService.fetchRegionDetails(regionName);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+};
