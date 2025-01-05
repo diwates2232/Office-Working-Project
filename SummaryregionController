@@ -172,3 +172,68 @@ module.exports = {
     getRegionSummary,
     getRegionDetails,
 };
+
+
+
+
+// inprove time
+
+
+
+const { fetchData } = require("../services/excelService");
+
+// Fetch global summary
+const getGlobalSummary = async (req, res) => {
+    try {
+        const data = await fetchData();
+        res.status(200).json(generateSummary(data));
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Fetch region summary
+const getRegionSummary = async (req, res) => {
+    const { regionName } = req.params;
+
+    try {
+        const data = await fetchData(regionName);
+        if (!data.archivers.length && !data.controllers.length && !data.cameras.length && !data.servers.length) {
+            return res.status(404).json({ error: "Region not found" });
+        }
+        res.status(200).json(generateSummary(data));
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Fetch region details
+const getRegionDetails = async (req, res) => {
+    const { regionName } = req.params;
+
+    try {
+        const data = await fetchData(regionName);
+        if (!data.archivers.length && !data.controllers.length && !data.cameras.length && !data.servers.length) {
+            return res.status(404).json({ error: "Region not found" });
+        }
+        res.status(200).json(data);
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Generate summary
+const generateSummary = (data) => ({
+    total_devices: data.archivers.length + data.controllers.length + data.cameras.length + data.servers.length,
+    total_online: data.archivers.filter((d) => d.status === "Online").length +
+        data.controllers.filter((d) => d.status === "Online").length +
+        data.cameras.filter((d) => d.status === "Online").length +
+        data.servers.filter((d) => d.status === "Online").length,
+    total_offline: data.archivers.filter((d) => d.status === "Offline").length +
+        data.controllers.filter((d) => d.status === "Offline").length +
+        data.cameras.filter((d) => d.status === "Offline").length +
+        data.servers.filter((d) => d.status === "Offline").length,
+    details: data,
+});
+
+module.exports = { getGlobalSummary, getRegionSummary, getRegionDetails };
