@@ -475,4 +475,102 @@ module.exports = { fetchGlobalData, fetchRegionData };
 imptovr time cinplexity
 
 
+const xlsx = require("xlsx");
+const path = require("path");
+const ping = require("ping");
+let cachedData = null; // Cache for data
+let lastCacheUpdateTime = null;
 
+const CACHE_EXPIRY_MS = 300000; // Cache expiry time (5 minutes)
+const excelFilePath = path.join(__dirname, "../data/devices.xlsx");
+
+// Load and process Excel data
+const loadExcelData = async () => {
+    try {
+        const workbook = xlsx.readFile(excelFilePath);
+        const sheetName = workbook.SheetNames[0];
+        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        return data;
+    } catch (error) {
+        console.error("Error loading Excel file:", error.message);
+        throw new Error("Failed to load Excel data");
+    }
+};
+
+// Ping devices in parallel
+const pingDevices = async (devices) => {
+    const pingPromises = devices.map(async (device) => {
+        const ipAddress = device.ip_address;
+        device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+    });
+
+    await Promise.all(pingPromises);
+};
+
+// Ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Process data to create summaries and details
+const processDeviceData = async () => {
+    const devices = await loadExcelData();
+    await pingDevices(devices);
+
+    const globalSummary = { totalDevices: 0, totalOnline: 0, totalOffline: 0 };
+    const regionSummaries = {};
+    const regionDetails = {};
+
+    devices.forEach((device) => {
+        const region = device.region || "Unknown";
+        const status = device.status === "Online" ? "Online" : "Offline";
+
+        // Update global summary
+        globalSummary.totalDevices++;
+        globalSummary[status === "Online" ? "totalOnline" : "totalOffline"]++;
+
+        // Update region summaries
+        if (!regionSummaries[region]) {
+            regionSummaries[region] = { totalDevices: 0, totalOnline: 0, totalOffline: 0 };
+        }
+        regionSummaries[region].totalDevices++;
+        regionSummaries[region][status === "Online" ? "totalOnline" : "totalOffline"]++;
+
+        // Add to region details
+        if (!regionDetails[region]) {
+            regionDetails[region] = [];
+        }
+        regionDetails[region].push(device);
+    });
+
+    return { globalSummary, regionSummaries, regionDetails };
+};
+
+// Fetch cached data or reload if expired
+const getCachedData = async () => {
+    const now = Date.now();
+    if (!cachedData || now - lastCacheUpdateTime > CACHE_EXPIRY_MS) {
+        cachedData = await processDeviceData();
+        lastCacheUpdateTime = now;
+    }
+    return cachedData;
+};
+
+const fetchGlobalData = async () => {
+    const { globalSummary } = await getCachedData();
+    return { summary: globalSummary };
+};
+
+const fetchRegionData = async (regionName) => {
+    const { regionSummaries, regionDetails } = await getCachedData();
+    return {
+        summary: regionSummaries[regionName] || {},
+        details: regionDetails[regionName] || [],
+    };
+};
+
+module.exports = { fetchGlobalData, fetchRegionData };
