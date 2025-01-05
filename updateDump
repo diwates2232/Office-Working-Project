@@ -1,1 +1,214 @@
 
+const express = require("express");
+const {
+    getGlobalSummary,
+    getGlobalDetails,
+    getRegionSummary,
+    getRegionDetails,
+    refreshData, // New controller for data refresh
+} = require("../controllers/regionControllers");
+
+const router = express.Router();
+
+// Global Routes
+router.get("/summary/global", getGlobalSummary);
+router.get("/details/global", getGlobalDetails);
+
+// Region Routes
+router.get("/summary/:regionName", getRegionSummary);
+router.get("/details/:regionName", getRegionDetails);
+
+// Data Refresh Route
+router.post("/refresh-data", refreshData);
+
+module.exports = router;
+
+
+
+
+
+const { fetchGlobalData, fetchRegionData, loadExcelData } = require("../services/excelService");
+
+// Global Summary Controller
+const getGlobalSummary = async (req, res) => {
+    try {
+        const globalData = await fetchGlobalData();
+        res.status(200).json({ summary: globalData.summary });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Global Details Controller
+const getGlobalDetails = async (req, res) => {
+    try {
+        const globalData = await fetchGlobalData();
+        if (!Array.isArray(globalData.details)) {
+            return res.status(400).json({ error: "Invalid data format for details" });
+        }
+        res.status(200).json({ details: globalData.details });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Region Summary Controller
+const getRegionSummary = async (req, res) => {
+    const { regionName } = req.params;
+    try {
+        const regionData = await fetchRegionData(regionName);
+        res.status(200).json({ summary: regionData.summary });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Region Details Controller
+const getRegionDetails = async (req, res) => {
+    const { regionName } = req.params;
+    try {
+        const regionData = await fetchRegionData(regionName);
+        if (!Array.isArray(regionData.details)) {
+            return res.status(400).json({ error: "Invalid data format for details" });
+        }
+        res.status(200).json({ details: regionData.details });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Data Refresh Controller
+const refreshData = async (req, res) => {
+    try {
+        await loadExcelData(); // Reload data
+        res.status(200).json({ message: "Data refreshed successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to refresh data", details: error.message });
+    }
+};
+
+module.exports = {
+    getGlobalSummary,
+    getGlobalDetails,
+    getRegionSummary,
+    getRegionDetails,
+    refreshData,
+};
+
+
+
+
+
+const xlsx = require("xlsx");
+const ping = require("ping");
+const pLimit = require("p-limit");
+
+let cachedData = null;
+
+// Function to load Excel Data
+const loadExcelData = async () => {
+    const workbook = xlsx.readFile("./src/data/Devices.xlsx"); // Adjust path as needed
+    const globalSheet = workbook.Sheets["Global"];
+    const regionsSheet = workbook.Sheets["Regions"];
+
+    const globalData = xlsx.utils.sheet_to_json(globalSheet);
+    const regionData = xlsx.utils.sheet_to_json(regionsSheet);
+
+    cachedData = {
+        global: processGlobalData(globalData),
+        regions: processRegionData(regionData),
+    };
+};
+
+// Function to process global data
+const processGlobalData = (data) => {
+    const summary = {};
+    const details = data.map((row) => ({
+        name: row.Name,
+        ip_address: row.IP,
+        status: "Unknown",
+    }));
+
+    const totalDevices = details.length;
+    summary.totalDevices = totalDevices;
+    summary.totalOnlineDevices = 0; // Placeholder
+    summary.totalOfflineDevices = totalDevices; // Placeholder
+
+    return { summary, details };
+};
+
+// Function to process region data
+const processRegionData = (data) => {
+    const regions = {};
+
+    data.forEach((row) => {
+        const regionName = row.Region;
+        if (!regions[regionName]) {
+            regions[regionName] = { details: [], summary: {} };
+        }
+
+        regions[regionName].details.push({
+            name: row.Name,
+            ip_address: row.IP,
+            status: "Unknown",
+        });
+    });
+
+    // Add summaries
+    Object.keys(regions).forEach((region) => {
+        const details = regions[region].details;
+        const total = details.length;
+        const online = details.filter((device) => device.status === "Online").length;
+        const offline = total - online;
+
+        regions[region].summary = { total, online, offline };
+    });
+
+    return regions;
+};
+
+// Function to fetch global data
+const fetchGlobalData = async () => {
+    if (!cachedData) await loadExcelData();
+    return cachedData.global;
+};
+
+// Function to fetch region data
+const fetchRegionData = async (regionName) => {
+    if (!cachedData) await loadExcelData();
+    return cachedData.regions[regionName];
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Function to ping devices in parallel
+const pingDevices = async (devices) => {
+    const limit = pLimit(10); // Limit concurrent pings to 10
+    const pingPromises = devices.map((device) =>
+        limit(async () => {
+            const ipAddress = device.ip_address;
+            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+        })
+    );
+
+    await Promise.all(pingPromises);
+};
+
+// Preload data on server start
+loadExcelData();
+
+module.exports = { fetchGlobalData, fetchRegionData, loadExcelData };
+
+
+
+
+
+<button id="refresh-button">Refresh Data</button>
+<div id="device-details"></div>
