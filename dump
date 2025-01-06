@@ -530,3 +530,46 @@ const pingDevice = (ip) => {
 loadExcelData();
 
 module.exports = { fetchGlobalData, fetchRegionData };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const express = require('express');
+const { fetchGlobalData, fetchRegionData } = require('./services/excelService');
+
+const app = express();
+const PORT = 3000;
+
+app.get('/api/regions/summary/global', async (req, res) => {
+    try {
+        const globalData = await fetchGlobalData();
+        res.json(globalData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/regions/details/:region', async (req, res) => {
+    try {
+        const regionData = await fetchRegionData(req.params.region.toUpperCase());
+        res.json(regionData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
