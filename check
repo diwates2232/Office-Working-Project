@@ -1,5 +1,176 @@
 
+import express from 'express';
+import bodyParser from 'body-parser';
+import { fetchGlobalData, fetchRegionData } from './services/excelService.js';
 
+const app = express();
+const PORT = 3000;
+
+app.use(bodyParser.json());
+
+// Global summary API
+app.get('/api/regions/summary/global', async (req, res) => {
+    try {
+        const data = await fetchGlobalData();
+        res.json(data.summary);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Region details API
+app.get('/api/regions/details/:region', async (req, res) => {
+    const includeStatus = req.query.includeStatus === 'true';
+    const { region } = req.params;
+
+    try {
+        const data = await fetchRegionData(region, includeStatus);
+        res.json(data.details);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+
+
+
+
+
+
+
+import xlsx from 'xlsx';
+import path from 'path';
+import ping from 'ping';
+import pLimit from 'p-limit';
+
+const DATA_PATH = path.join('C:/Users/W0024618/Desktop/Backend/src/data');
+const limit = pLimit(10); // Limit concurrent tasks
+
+// Cache settings
+let cachedData = null;
+let cacheTimestamp = null;
+const CACHE_DURATION = 5 * 60 * 1000; // Cache for 5 minutes
+
+// Load data from Excel files
+const loadExcelData = () => {
+    const loadSheet = (fileName, sheetIndex = 0) => {
+        const filePath = path.join(DATA_PATH, fileName);
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[sheetIndex];
+        return xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    };
+
+    return {
+        archivers: loadSheet('ArchiverData.xlsx'),
+        cameras: loadSheet('CameraData.xlsx'),
+        controllers: loadSheet('ControllerData.xlsx'),
+        servers: loadSheet('ServerData.xlsx'),
+    };
+};
+
+const excelData = loadExcelData();
+
+// Calculate detailed summary
+const calculateSummary = (devices) => {
+    const summary = {};
+
+    for (const [key, deviceList] of Object.entries(devices)) {
+        const total = deviceList.length;
+        const online = deviceList.filter(device => device.status === 'Online').length;
+        const offline = total - online;
+
+        summary[key] = { total, online, offline };
+    }
+
+    return {
+        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
+        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
+        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
+        ...summary,
+    };
+};
+
+// Ping devices in batches
+const pingDevices = async (devices, batchSize = 10) => {
+    for (let i = 0; i < devices.length; i += batchSize) {
+        const batch = devices.slice(i, i + batchSize);
+        const pingPromises = batch.map(device =>
+            limit(() => pingDevice(device.ip_address)
+                .then(status => device.status = status || 'IP Address Missing'))
+        );
+        await Promise.all(pingPromises);
+    }
+};
+
+// Ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? 'Online' : 'Offline');
+        });
+    });
+};
+
+// Fetch global data with caching
+const fetchGlobalData = async () => {
+    const now = Date.now();
+
+    if (cachedData && now - cacheTimestamp < CACHE_DURATION) {
+        return cachedData; // Return cached data
+    }
+
+    const { archivers, cameras, controllers, servers } = excelData;
+
+    // Ping all devices
+    await Promise.all([
+        pingDevices(archivers),
+        pingDevices(cameras),
+        pingDevices(controllers),
+        pingDevices(servers),
+    ]);
+
+    const summary = calculateSummary({
+        Archivers: archivers,
+        Cameras: cameras,
+        Controllers: controllers,
+        Servers: servers,
+    });
+
+    cachedData = { summary, details: { Archivers: archivers, Cameras: cameras, Controllers: controllers, Servers: servers } };
+    cacheTimestamp = now;
+    return cachedData;
+};
+
+// Fetch region-specific data
+const fetchRegionData = async (region, includeStatus = false) => {
+    const regionArchivers = excelData.archivers.filter(device => device.Location === region);
+    const regionCameras = excelData.cameras.filter(device => device.Location === region);
+    const regionControllers = excelData.controllers.filter(device => device.Location === region);
+    const regionServers = excelData.servers.filter(device => device.Location === region);
+
+    if (includeStatus) {
+        await Promise.all([
+            pingDevices(regionArchivers),
+            pingDevices(regionCameras),
+            pingDevices(regionControllers),
+            pingDevices(regionServers),
+        ]);
+    }
+
+    const summary = calculateSummary({
+        Archivers: regionArchivers,
+        Cameras: regionCameras,
+        Controllers: regionControllers,
+        Servers: regionServers,
+    });
+
+    return { summary, details: { Archivers: regionArchivers, Cameras: regionCameras, Controllers: regionControllers, Servers: regionServers } };
+};
+
+export { fetchGlobalData, fetchRegionData };
 
 
 
