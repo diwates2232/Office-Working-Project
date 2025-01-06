@@ -1,1 +1,227 @@
+const express = require("express");
+const {
+    getGlobalSummary,
+    getGlobalDetails,
+    getRegionSummary,
+    getRegionDetails,
+    refreshData, // New controller for data refresh
+} = require("../controllers/regionControllers");
 
+const router = express.Router();
+
+// Global Routes
+router.get("/summary/global", getGlobalSummary);
+router.get("/details/global", getGlobalDetails);
+
+// Region Routes
+router.get("/summary/:regionName", getRegionSummary);
+router.get("/details/:regionName", getRegionDetails);
+
+// Data Refresh Route
+router.post("/refresh-data", refreshData);
+
+module.exports = router;
+
+
+
+
+
+
+
+const { fetchGlobalData, fetchRegionData, loadExcelData } = require("../services/excelService");
+
+// Global Summary Controller
+const getGlobalSummary = async (req, res) => {
+    try {
+        const globalData = await fetchGlobalData();
+        res.status(200).json({ summary: globalData.summary });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Global Details Controller
+const getGlobalDetails = async (req, res) => {
+    try {
+        const globalData = await fetchGlobalData();
+        if (!Array.isArray(globalData.details)) {
+            return res.status(400).json({ error: "Invalid data format for details" });
+        }
+        res.status(200).json({ details: globalData.details });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Region Summary Controller
+const getRegionSummary = async (req, res) => {
+    const { regionName } = req.params;
+    try {
+        const regionData = await fetchRegionData(regionName);
+        res.status(200).json({ summary: regionData.summary });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Region Details Controller
+const getRegionDetails = async (req, res) => {
+    const { regionName } = req.params;
+    try {
+        const regionData = await fetchRegionData(regionName);
+        if (!Array.isArray(regionData.details)) {
+            return res.status(400).json({ error: "Invalid data format for details" });
+        }
+        res.status(200).json({ details: regionData.details });
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Data Refresh Controller
+const refreshData = async (req, res) => {
+    try {
+        await loadExcelData(); // Reload data
+        res.status(200).json({ message: "Data refreshed successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to refresh data", details: error.message });
+    }
+};
+
+module.exports = {
+    getGlobalSummary,
+    getGlobalDetails,
+    getRegionSummary,
+    getRegionDetails,
+    refreshData,
+};
+
+
+
+
+
+
+
+
+
+const xlsx = require("xlsx");
+const ping = require("ping");
+const path = require("path");
+
+let globalData = {
+    summary: {},
+    details: [],
+};
+
+let regionData = {};
+
+// Load data from Excel files
+const loadExcelData = () => {
+    try {
+        const archiverDataPath = path.resolve(__dirname, "../data/ArchiverData.xlsx");
+        const cameraDataPath = path.resolve(__dirname, "../data/CameraData.xlsx");
+        const controllerDataPath = path.resolve(__dirname, "../data/ControllerData.xlsx");
+        const serverDataPath = path.resolve(__dirname, "../data/ServerData.xlsx");
+
+        const archiverData = xlsx.utils.sheet_to_json(xlsx.readFile(archiverDataPath).Sheets.Sheet1);
+        const cameraData = xlsx.utils.sheet_to_json(xlsx.readFile(cameraDataPath).Sheets.Sheet1);
+        const controllerData = xlsx.utils.sheet_to_json(xlsx.readFile(controllerDataPath).Sheets.Sheet1);
+        const serverData = xlsx.utils.sheet_to_json(xlsx.readFile(serverDataPath).Sheets.Sheet1);
+
+        // Combine all data
+        const devices = [...archiverData, ...cameraData, ...controllerData, ...serverData];
+
+        globalData = processGlobalData(devices);
+        regionData = processRegionData(devices);
+    } catch (error) {
+        console.error("Error loading Excel data:", error.message);
+    }
+};
+
+// Process global data
+const processGlobalData = (devices) => {
+    const summary = {};
+
+    devices.forEach((device) => {
+        const { Region, Name, IP } = device;
+        const regionName = Region || "Unknown";
+        if (!summary[regionName]) {
+            summary[regionName] = { total: 0, online: 0, offline: 0 };
+        }
+        summary[regionName].total += 1;
+    });
+
+    return {
+        summary: summary,
+        details: devices.map((device) => ({
+            name: device.Name,
+            ip_address: device.IP,
+            status: "Unknown", // Default status
+        })),
+    };
+};
+
+// Process region data
+const processRegionData = (devices) => {
+    const regions = {};
+
+    devices.forEach((device) => {
+        const { Region, Name, IP } = device;
+        const regionName = Region || "Unknown";
+        if (!regions[regionName]) {
+            regions[regionName] = {
+                summary: { total: 0, online: 0, offline: 0 },
+                details: [],
+            };
+        }
+        regions[regionName].details.push({
+            name: Name,
+            ip_address: IP,
+            status: "Unknown", // Default status
+        });
+        regions[regionName].summary.total += 1;
+    });
+
+    return regions;
+};
+
+// Ping devices in parallel
+const pingDevices = async (devices) => {
+    const pingPromises = devices.map(async (device) => {
+        const ipAddress = device.ip_address;
+        device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+    });
+
+    await Promise.all(pingPromises);
+};
+
+// Ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Fetch global data
+const fetchGlobalData = async () => {
+    await pingDevices(globalData.details); // Update device statuses
+    return globalData;
+};
+
+// Fetch region data
+const fetchRegionData = async (regionName) => {
+    const region = regionData[regionName];
+    if (!region) {
+        throw new Error(`Region "${regionName}" not found`);
+    }
+
+    await pingDevices(region.details); // Update device statuses
+    return region;
+};
+
+// Preload data
+loadExcelData();
+
+module.exports = { fetchGlobalData, fetchRegionData };
