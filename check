@@ -252,6 +252,207 @@ const fetchRegionData = async (regionName) => {
 
 
 
+import xlsx from 'xlsx';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import pLimit from 'p-limit';
+import ping from 'ping';
+
+// Set directory path for loading Excel files
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_PATH = path.join(__dirname, '../data');
+
+// Constants for file names
+const ARCHIVER_FILE = 'ArchiverData.xlsx';
+const CAMERA_FILE = 'CameraData.xlsx';
+const CONTROLLER_FILE = 'ControllerData.xlsx';
+const SERVER_FILE = 'ServerData.xlsx';
+
+// Object to store loaded data
+const excelData = {
+  archivers: [],
+  cameras: [],
+  controllers: [],
+  servers: [],
+};
+
+// Helper function to load Excel data
+const loadExcelFile = (fileName) => {
+  const filePath = path.join(DATA_PATH, fileName);
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+  return data;
+};
+
+// Load all Excel data into memory
+const loadExcelData = () => {
+  try {
+    excelData.archivers = loadExcelFile(ARCHIVER_FILE);
+    excelData.cameras = loadExcelFile(CAMERA_FILE);
+    excelData.controllers = loadExcelFile(CONTROLLER_FILE);
+    excelData.servers = loadExcelFile(SERVER_FILE);
+    console.log('Excel data loaded successfully');
+  } catch (error) {
+    console.error('Error loading Excel data:', error.message);
+    throw new Error('Failed to load Excel data');
+  }
+};
+
+// Helper function to calculate summary
+const calculateSummary = (devices) => {
+  const summary = {};
+
+  for (const [key, deviceList] of Object.entries(devices)) {
+    const total = deviceList.length;
+    const online = deviceList.filter(device => device.status === 'Online').length;
+    const offline = total - online;
+
+    summary[key] = { total, online, offline };
+  }
+
+  return {
+    totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
+    totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
+    totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
+    ...summary,
+  };
+};
+
+// Helper function to ping devices
+const pingDevices = async (devices) => {
+  const limit = pLimit(5); // Limit parallel requests to 5
+  const pingPromises = devices.map(device => limit(async () => {
+    const ipAddress = device.ip_address;
+    device.status = ipAddress ? await pingDevice(ipAddress) : 'IP Address Missing';
+  }));
+
+  await Promise.all(pingPromises);
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+  return new Promise((resolve) => {
+    ping.sys.probe(ip, (isAlive) => {
+      resolve(isAlive ? 'Online' : 'Offline');
+    });
+  });
+};
+
+// Fetch global data
+const fetchGlobalData = async () => {
+  try {
+    await Promise.all([
+      pingDevices(excelData.archivers),
+      pingDevices(excelData.cameras),
+      pingDevices(excelData.controllers),
+      pingDevices(excelData.servers),
+    ]);
+
+    const summary = calculateSummary({
+      Archivers: excelData.archivers,
+      Cameras: excelData.cameras,
+      Controllers: excelData.controllers,
+      Servers: excelData.servers,
+    });
+
+    return { summary, details: excelData };
+  } catch (error) {
+    console.error('Error fetching global data:', error.message);
+    throw new Error('Failed to fetch global data');
+  }
+};
+
+// Fetch data for a specific region
+const fetchRegionData = async (region) => {
+  try {
+    const regionArchivers = excelData.archivers.filter(device => device.Location === region);
+    const regionCameras = excelData.cameras.filter(device => device.Location === region);
+    const regionControllers = excelData.controllers.filter(device => device.Location === region);
+    const regionServers = excelData.servers.filter(device => device.Location === region);
+
+    await Promise.all([
+      pingDevices(regionArchivers),
+      pingDevices(regionCameras),
+      pingDevices(regionControllers),
+      pingDevices(regionServers),
+    ]);
+
+    const summary = calculateSummary({
+      Archivers: regionArchivers,
+      Cameras: regionCameras,
+      Controllers: regionControllers,
+      Servers: regionServers,
+    });
+
+    const devices = {
+      Archivers: regionArchivers,
+      Cameras: regionCameras,
+      Controllers: regionControllers,
+      Servers: regionServers,
+    };
+
+    return { summary, details: devices };
+  } catch (error) {
+    console.error(`Error fetching data for region ${region}:`, error.message);
+    throw new Error(`Failed to fetch data for region ${region}`);
+  }
+};
+
+// Preload data
+loadExcelData();
+
+export { fetchGlobalData, fetchRegionData };
+
+
+
+
+
+
+import express from 'express';
+import { fetchGlobalData, fetchRegionData } from './services/excelService.js';
+
+const app = express();
+const PORT = 3000;
+
+app.get('/api/regions/summary/global', async (req, res) => {
+  try {
+    const data = await fetchGlobalData();
+    res.json(data.summary);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/regions/details/global', async (req, res) => {
+  try {
+    const data = await fetchGlobalData();
+    res.json(data.details);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/regions/summary/:region', async (req, res) => {
+  try {
+    const { region } = req.params;
+    const data = await fetchRegionData(region);
+    res.json(data.summary);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+
+
+
+
+
 
 
 
