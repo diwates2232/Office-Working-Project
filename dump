@@ -410,3 +410,123 @@ const pingDevice = (ip) => {
 loadExcelData();
 
 module.exports = { fetchGlobalData, fetchRegionData };
+
+
+
+
+
+
+
+
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
+const ping = require('ping');
+
+// Define the data directory and file names
+const dataDir = path.join(__dirname, '../data');
+const fileNames = {
+    archivers: 'ArchiverData.xlsx',
+    cameras: 'CameraData.xlsx',
+    controllers: 'ControllerData.xlsx',
+    servers: 'ServerData.xlsx',
+};
+
+// Object to store loaded data
+const devices = {};
+
+// Function to load Excel data
+const loadExcelData = () => {
+    try {
+        for (const [key, fileName] of Object.entries(fileNames)) {
+            const filePath = path.join(dataDir, fileName);
+            
+            if (!fs.existsSync(filePath)) {
+                console.error(`Error loading Excel data: File not found at ${filePath}`);
+                throw new Error(`File not found: ${filePath}`);
+            }
+
+            const workbook = xlsx.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+            // Standardize and organize data
+            devices[key] = data.map(row => ({
+                name: row['Archiver Name'] || row['Camera Name'] || row['Controller Name'] || row['Server Name'],
+                ip_address: row['ip_address'],
+                location: row['Location'],
+                status: 'Unknown',
+            }));
+        }
+        console.log('Excel data loaded successfully.');
+    } catch (error) {
+        console.error('Error loading Excel data:', error.message);
+        throw new Error('Failed to load Excel data');
+    }
+};
+
+// Function to fetch global data summary
+const fetchGlobalData = async () => {
+    const allDevices = Object.values(devices).flat();
+    await pingDevices(allDevices);
+    return calculateSummary(devices);
+};
+
+// Function to fetch region-specific data
+const fetchRegionData = async (region) => {
+    const regionDevices = {};
+    for (const [key, deviceList] of Object.entries(devices)) {
+        regionDevices[key] = deviceList.filter(device => device.location === region);
+    }
+
+    if (Object.values(regionDevices).flat().length === 0) {
+        throw new Error(`Region "${region}" not found`);
+    }
+
+    await pingDevices(Object.values(regionDevices).flat());
+    return { summary: calculateSummary(regionDevices), details: Object.values(regionDevices).flat() };
+};
+
+// Helper function to calculate detailed summary
+const calculateSummary = (devices) => {
+    const summary = {};
+
+    for (const [key, deviceList] of Object.entries(devices)) {
+        const total = deviceList.length;
+        const online = deviceList.filter(device => device.status === "Online").length;
+        const offline = total - online;
+
+        summary[key] = { total, online, offline };
+    }
+
+    return {
+        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
+        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
+        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
+        ...summary,
+    };
+};
+
+// Function to ping devices in parallel
+const pingDevices = async (devices) => {
+    const pingPromises = devices.map(async (device) => {
+        const ipAddress = device.ip_address;
+        device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+    });
+
+    await Promise.all(pingPromises);
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Preload data
+loadExcelData();
+
+module.exports = { fetchGlobalData, fetchRegionData };
