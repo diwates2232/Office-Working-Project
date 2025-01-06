@@ -225,3 +225,21 @@ const fetchRegionData = async (regionName) => {
 loadExcelData();
 
 module.exports = { fetchGlobalData, fetchRegionData };
+
+
+
+
+
+
+
+
+
+const fetchRegionData = async (regionName) => {
+    const region = regionData[regionName];
+    if (!region) {
+        throw new Error(`Region "${regionName}" not found in the data. Available regions: ${Object.keys(regionData).join(", ")}`);
+    }
+
+    await pingDevices(region.details); // Update device statuses
+    return region;
+};
