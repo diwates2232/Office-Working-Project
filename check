@@ -251,3 +251,58 @@ package.json
         "xlsx": "^0.18.5"
     }
 }
+
+
+
+
+
+const pLimit = require("p-limit");
+
+const pingDevices = async (devices) => {
+    const limit = pLimit(10); // Limit to 10 concurrent pings
+    const pingPromises = devices.map((device) =>
+        limit(async () => {
+            const ipAddress = device.ip_address;
+            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+        })
+    );
+
+    await Promise.all(pingPromises);
+};
+
+
+
+
+
+
+
+
+
+
+
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const regionRoutes = require("./routes/regionRoutes");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors({ origin: "http://localhost:3000" })); // Allow only frontend origin
+app.use(bodyParser.json());
+
+// Routes
+app.use("/api/regions", regionRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send("Something went wrong!");
+});
+
+// Start Server
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
