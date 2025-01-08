@@ -1,1 +1,345 @@
+const baseUrl = "http://localhost:3000/api/regions";
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Fetch summary for the default region (global)
+    fetchSummary("global");
+
+    // Add event listeners to region buttons
+    const regionButtons = document.querySelectorAll(".region-button");
+    regionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const region = button.getAttribute("data-region");
+            document.getElementById("region-title").textContent = `${region.toUpperCase()} Summary`;
+            fetchSummary(region);
+        });
+    });
+
+    // Close modal on button click
+    document.getElementById("close-modal").addEventListener("click", () => {
+        document.getElementById("modal").style.display = "none";
+    });
+});
+
+function fetchSummary(region) {
+    const summaryUrl = `${baseUrl}/summary/${region}`;
+    const detailsUrl = `${baseUrl}/details/${region}`;
+
+    Promise.all([fetch(summaryUrl), fetch(detailsUrl)])
+        .then((responses) => {
+            if (!responses[0].ok || !responses[1].ok) {
+                throw new Error("Error fetching data from API.");
+            }
+            return Promise.all(responses.map((res) => res.json()));
+        })
+        .then(([summary, details]) => {
+            console.log("Summary Data:", summary);
+            console.log("Details Data:", details);
+            updateSummary(summary);
+            updateDetails(details);
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert("Failed to load data. Please check the console for details.");
+        });
+}
+
+function updateSummary(data) {
+    document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
+    document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
+    document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
+}
+
+function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    detailsContainer.innerHTML = "";
+
+    // Validate that 'data.details' exists and is an array
+    if (!data || !Array.isArray(data.details)) {
+        console.error("Invalid or empty details data:", data.details);
+        detailsContainer.innerHTML = "<p>No details available.</p>";
+        return;
+    }
+
+    // Sort devices: Offline devices first
+    const sortedDevices = data.details.sort((a, b) => {
+        if (a.status === "Offline" && b.status !== "Offline") return -1;
+        if (a.status !== "Offline" && b.status === "Offline") return 1;
+        return 0;
+    });
+
+    // Render devices
+    sortedDevices.forEach((device) => {
+        const card = document.createElement("div");
+        card.className = "device-card";
+
+        card.innerHTML = `
+            <h3>${device.name || "Unknown Device"}</h3>
+            <p>IP: ${device.ip || "N/A"}</p>
+            <p>Status: ${device.status || "Unknown"}</p>
+            <button class="details-button" onclick="showModal('${device.name}', '${device.ip}', '${device.status}')">Details</button>
+        `;
+
+        detailsContainer.appendChild(card);
+    });
+}
+
+function showModal(name, ip, status) {
+    document.getElementById("modal-title").textContent = `Details for ${name}`;
+    document.getElementById("modal-body").innerHTML = `
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>IP:</strong> ${ip}</li>
+        <li><strong>Status:</strong> ${status}</li>
+    `;
+    document.getElementById("modal").style.display = "block";
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    height: 100vh;
+    background-color: #f4f4f9;
+}
+ 
+/* Container */
+.container {
+    display: flex;
+    width: 100%;
+}
+ 
+/* Sidebar */
+#sidebar {
+    width: 20%;
+    background-color: #222831;
+    color: white;
+    padding: 20px;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+}
+ 
+#sidebar h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+ 
+.region-button {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 10px;
+    border: none;
+    background-color: #00adb5;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    text-align: center;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+ 
+.region-button:hover {
+    background-color: #007a80;
+}
+ 
+/* Content */
+#content {
+    width: 80%;
+    padding: 20px;
+}
+ 
+#region-title {
+    font-size: 24px;
+    color: #333;
+}
+ 
+.summary {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+ 
+.card {
+    background: white;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    flex: 1;
+}
+ 
+.card h3 {
+    margin-bottom: 10px;
+    color: #555;
+}
+ 
+/* Details Section */
+#details-section {
+    margin-top: 30px;
+}
+ 
+#device-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+ 
+.device-card {
+    flex: 1 1 calc(33.333% - 10px);
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+ 
+.device-card h3 {
+    margin-bottom: 10px;
+    color: #333;
+}
+ 
+.device-card p {
+    font-size: 14px;
+    margin: 5px 0;
+}
+ 
+.details-button {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 5px 10px;
+    background-color: #00adb5;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+ 
+.details-button:hover {
+    background-color: #007a80;
+}
+ 
+/* Modal */
+#modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    width: 40%;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+}
+ 
+.modal-content {
+    position: relative;
+}
+ 
+#close-modal {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    color: #333;
+}
+ 
+#modal-body {
+    margin-top: 20px;
+}
+ 
+.footer{
+    text-align: center;
+    padding: 15px;
+    background-color: #222;
+    color:#fff;
+    font-size: 14px;
+    width: 100%;
+    position: fixed;
+    bottom: 0;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0,0.1);
+}
+ 
+.footer-logo{
+    height: 40px;
+    display: block;
+    margin: 0 auto 10px;
+}
+ 
+.footer a{
+    color: #ffcc00;
+    text-decoration:underline;
+}
+.footer a:hover{
+    text-decoration: underline;
+}
+.footer strong{
+    color: #ffcc00;
+}
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="sidebar">
+            <h2>Regions</h2>
+            <button class="region-button" data-region="global">Global</button>
+            <button class="region-button" data-region="apac">APAC</button>
+            <button class="region-button" data-region="emea">EMEA</button>
+            <button class="region-button" data-region="laca">LACA</button>
+            <button class="region-button" data-region="namer">NAMER</button>
+        </div>
+        <div id="content">
+            <h1 id="region-title">Global Summary</h1>
+            <div class="summary">
+                <div class="card">
+                    <h3>Total Devices</h3>
+                    <p id="total-devices">Loading...</p>
+                </div>
+                <div class="card">
+                    <h3>Online Devices</h3>
+                    <p id="online-devices">Loading...</p>
+                </div>
+                <div class="card">
+                    <h3>Offline Devices</h3>
+                    <p id="offline-devices">Loading...</p>
+                </div>
+            </div>
+            <div id="details-section">
+                <h2>Device Details</h2>
+                <div id="device-details">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal"
+
+
+
+
+
+
+
 
