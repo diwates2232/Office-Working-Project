@@ -1,3 +1,75 @@
+updated app js
+
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const regionRoutes = require("./routes/regionRoutes");
+const { loadExcelData } = require("./services/excelService");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(
+  cors({
+    origin: "http://127.0.0.1:5501",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+app.use(bodyParser.json());
+
+// Load Excel data
+loadExcelData();
+app.use((req, res, next) => {
+  if (!Object.keys(allData).length) {
+    return res.status(500).json({ error: "Data not loaded properly." });
+  }
+  next();
+});
+
+// Routes
+app.use("/api/regions", regionRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: "Internal Server Error", details: err.message });
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+
+
+add.logs
+
+const loadExcelData = () => {
+  try {
+    const archiverWorkbook = xlsx.readFile(archiverPath);
+    const controllerWorkbook = xlsx.readFile(controllerPath);
+    const cameraWorkbook = xlsx.readFile(cameraPath);
+    const serverWorkbook = xlsx.readFile(serverPath);
+
+    allData = {
+      archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
+      controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
+      cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
+      servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
+    };
+    console.log("Data loaded successfully.");
+  } catch (error) {
+    console.error("Error loading Excel data:", error.message);
+  }
+};
+
+
+
+
+
 app.js
 
 require("dotenv").config();
