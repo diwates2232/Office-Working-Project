@@ -1,4 +1,58 @@
+const ping = require("ping");
+const pLimit = require("p-limit");
 
+// Helper function to calculate detailed summary
+const calculateSummary = (devices) => {
+    const summary = {};
+
+    for (const [key, deviceList] of Object.entries(devices)) {
+        const total = deviceList.length;
+        const online = deviceList.filter(device => device.status === "Online").length;
+        const offline = total - online;
+
+        summary[key] = { total, online, offline };
+    }
+
+    return {
+        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
+        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
+        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
+        ...summary,
+    };
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Function to ping devices concurrently with a limit
+const pingDevices = async (devices) => {
+    const limit = pLimit(10); // Limit to 10 concurrent pings
+    const pingPromises = devices.map((device) =>
+        limit(async () => {
+            const ipAddress = device.ip_address;
+            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+        })
+    );
+
+    await Promise.all(pingPromises);
+};
+
+// Function to load data from Excel
+const loadExcelData = () => {
+    // Implement your logic here to load data from Excel (e.g., read and parse the file)
+    console.log("Excel data loaded");
+};
+
+// Preload data (if needed)
+loadExcelData();
+
+module.exports = { loadExcelData, calculateSummary, pingDevices };
 
 
 
