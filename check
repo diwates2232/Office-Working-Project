@@ -1,4 +1,47 @@
 
+function fetchSummary(region) {
+    const summaryUrl = `${baseUrl}/summary/${region}`;
+    const detailsUrl = `${baseUrl}/details/${region}`;
+
+    Promise.all([fetch(summaryUrl), fetch(detailsUrl)])
+        .then((responses) => {
+            if (!responses[0].ok || !responses[1].ok) {
+                throw new Error("Error fetching data from API.");
+            }
+
+            // Parse both responses as JSON
+            return Promise.all(responses.map((res) => res.json()));
+        })
+        .then(([summary, details]) => {
+            console.log("Summary Data:", summary);
+            console.log("Details Data:", details);
+
+            // Update the page with the fetched data
+            updateSummary(summary);
+
+            if (details && details.devices) {
+                // Assuming 'devices' is part of the 'details' response
+                const devices = details.devices;
+                console.log("Device Data:", devices); // Log device data
+
+                // Update the device details section
+                displayDeviceDetails(devices);
+            } else {
+                console.warn("No devices found in details data.");
+                displayDeviceDetails([]); // Show "No details available" if no devices exist
+            }
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert("Failed to load data. Please check the console for details.");
+        });
+}
+
+
+
+
+
+
 function displayDeviceDetails(devices) {
     const detailsContainer = document.getElementById("device-details");
 
