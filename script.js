@@ -1,3 +1,62 @@
+
+function fetchDetails() {
+    fetch("http://localhost:3000/api/regions/details/global")
+        .then((response) => response.json())
+        .then((data) => {
+            console.log("Details Data:", data.details);
+            if (!data.details || Object.keys(data.details).length === 0) {
+                console.error("Invalid or empty details data");
+                return;
+            }
+            updateDetails(data.details);
+        })
+        .catch((error) => {
+            console.error("Error fetching details:", error);
+        });
+}
+
+
+
+
+
+function updateDetails(details) {
+    const detailsContainer = document.getElementById("details-container");
+    detailsContainer.innerHTML = ""; // Clear previous details
+
+    // Iterate over device types
+    ["cameras", "archivers", "controllers", "servers"].forEach((type) => {
+        if (details[type] && Array.isArray(details[type])) {
+            details[type].forEach((device) => {
+                const card = document.createElement("div");
+                card.className = "device-card";
+                card.innerHTML = `
+                    <h3>${device.cameraname || device.archivername || device.controllername || device.servername || "Unknown Device"}</h3>
+                    <p>IP: ${device.ip_address || "N/A"}</p>
+                    <p>Status: ${device.status || "Unknown"}</p>
+                    <button class="details-button" onclick="showModal('${device.cameraname || device.archivername || device.controllername || device.servername}', '${device.ip_address}', '${device.status}')">Details</button>
+                `;
+                detailsContainer.appendChild(card);
+            });
+        } else {
+            console.warn(`No data available for ${type}`);
+        }
+    });
+}
+
+
+
+
+if (!details[type] || details[type].length === 0) {
+    const message = document.createElement("p");
+    message.textContent = `No ${type} available.`;
+    detailsContainer.appendChild(message);
+}
+
+
+
+
+
+
 Updated.
 
 const baseUrl = "http://localhost:3000/api/regions";
