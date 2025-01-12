@@ -1,4 +1,85 @@
 
+// Add event listeners for region buttons
+document.querySelectorAll(".region-button").forEach((button) => {
+    button.addEventListener("click", () => {
+        const region = button.getAttribute("data-region"); // Get the region from the button's data attribute
+        fetchSummary(region); // Fetch the summary for the selected region
+        fetchDetails(region); // Fetch the details for the selected region
+    });
+});
+
+// Default: Fetch global summary and details on page load
+document.addEventListener("DOMContentLoaded", () => {
+    fetchSummary("global");
+    fetchDetails("global");
+});
+
+
+
+
+function fetchSummary(region) {
+    fetch(`http://localhost:3000/api/regions/summary/${region}`)
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.summary) {
+                updateSummary(data.summary); // Update the summary UI
+            } else {
+                console.error("Invalid summary data:", data);
+            }
+        })
+        .catch((error) => console.error("Error fetching summary:", error));
+}
+
+function updateSummary(summary) {
+    document.getElementById("total-devices").textContent = summary.totalDevices || 0;
+    document.getElementById("total-online-devices").textContent = summary.totalOnlineDevices || 0;
+    document.getElementById("total-offline-devices").textContent = summary.totalOfflineDevices || 0;
+
+    // Update individual device categories
+    document.getElementById("cameras-total").textContent = summary.cameras.total || 0;
+    document.getElementById("cameras-online").textContent = summary.cameras.online || 0;
+    document.getElementById("cameras-offline").textContent = summary.cameras.offline || 0;
+
+    document.getElementById("archivers-total").textContent = summary.archivers.total || 0;
+    document.getElementById("archivers-online").textContent = summary.archivers.online || 0;
+    document.getElementById("archivers-offline").textContent = summary.archivers.offline || 0;
+
+    document.getElementById("controllers-total").textContent = summary.controllers.total || 0;
+    document.getElementById("controllers-online").textContent = summary.controllers.online || 0;
+    document.getElementById("controllers-offline").textContent = summary.controllers.offline || 0;
+
+    document.getElementById("servers-total").textContent = summary.servers.total || 0;
+    document.getElementById("servers-online").textContent = summary.servers.online || 0;
+    document.getElementById("servers-offline").textContent = summary.servers.offline || 0;
+}
+
+
+
+
+function fetchDetails(region) {
+    fetch(`http://localhost:3000/api/regions/details/${region}`)
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.details) {
+                updateDetails(data.details); // Update the details UI
+            } else {
+                console.error("Invalid details data:", data);
+            }
+        })
+        .catch((error) => console.error("Error fetching details:", error));
+}
+
+
+
+.
+
+
+
+
+
+
+
+////
 function fetchDetails() {
     fetch("http://localhost:3000/api/regions/details/global")
         .then((response) => response.json())
