@@ -1,3 +1,34 @@
+<div id="summary-section">
+    <h2>Summary</h2>
+    <p>Total Devices: <span id="total-devices">N/A</span></p>
+    <p>Online Devices: <span id="online-devices">N/A</span></p>
+    <p>Offline Devices: <span id="offline-devices">N/A</span></p>
+
+    <h3>Cameras</h3>
+    <p>Total: <span id="camera-total">N/A</span></p>
+    <p>Online: <span id="camera-online">N/A</span></p>
+    <p>Offline: <span id="camera-offline">N/A</span></p>
+
+    <h3>Archivers</h3>
+    <p>Total: <span id="archiver-total">N/A</span></p>
+    <p>Online: <span id="archiver-online">N/A</span></p>
+    <p>Offline: <span id="archiver-offline">N/A</span></p>
+
+    <h3>Controllers</h3>
+    <p>Total: <span id="controller-total">N/A</span></p>
+    <p>Online: <span id="controller-online">N/A</span></p>
+    <p>Offline: <span id="controller-offline">N/A</span></p>
+
+    <h3>Servers</h3>
+    <p>Total: <span id="server-total">N/A</span></p>
+    <p>Online: <span id="server-online">N/A</span></p>
+    <p>Offline: <span id="server-offline">N/A</span></p>
+</div>
+
+
+
+
+
 
 
 function updateSummary(data) {
