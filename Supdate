@@ -1,76 +1,3 @@
-<div id="summary-section">
-    <h2>Summary</h2>
-    <p>Total Devices: <span id="total-devices">N/A</span></p>
-    <p>Online Devices: <span id="online-devices">N/A</span></p>
-    <p>Offline Devices: <span id="offline-devices">N/A</span></p>
-
-    <h3>Cameras</h3>
-    <p>Total: <span id="camera-total">N/A</span></p>
-    <p>Online: <span id="camera-online">N/A</span></p>
-    <p>Offline: <span id="camera-offline">N/A</span></p>
-
-    <h3>Archivers</h3>
-    <p>Total: <span id="archiver-total">N/A</span></p>
-    <p>Online: <span id="archiver-online">N/A</span></p>
-    <p>Offline: <span id="archiver-offline">N/A</span></p>
-
-    <h3>Controllers</h3>
-    <p>Total: <span id="controller-total">N/A</span></p>
-    <p>Online: <span id="controller-online">N/A</span></p>
-    <p>Offline: <span id="controller-offline">N/A</span></p>
-
-    <h3>Servers</h3>
-    <p>Total: <span id="server-total">N/A</span></p>
-    <p>Online: <span id="server-online">N/A</span></p>
-    <p>Offline: <span id="server-offline">N/A</span></p>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-function updateSummary(data) {
-    document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
-    document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
-    document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
-
-    // Update Cameras summary
-    document.getElementById("camera-total").textContent = data.summary?.cameras?.total || "N/A";
-    document.getElementById("camera-online").textContent = data.summary?.cameras?.online || "N/A";
-    document.getElementById("camera-offline").textContent = data.summary?.cameras?.offline || "N/A";
-
-    // Update Archivers summary
-    document.getElementById("archiver-total").textContent = data.summary?.archivers?.total || "N/A";
-    document.getElementById("archiver-online").textContent = data.summary?.archivers?.online || "N/A";
-    document.getElementById("archiver-offline").textContent = data.summary?.archivers?.offline || "N/A";
-
-    // Update Controllers summary
-    document.getElementById("controller-total").textContent = data.summary?.controllers?.total || "N/A";
-    document.getElementById("controller-online").textContent = data.summary?.controllers?.online || "N/A";
-    document.getElementById("controller-offline").textContent = data.summary?.controllers?.offline || "N/A";
-
-    // Update Servers summary
-    document.getElementById("server-total").textContent = data.summary?.servers?.total || "N/A";
-    document.getElementById("server-online").textContent = data.summary?.servers?.online || "N/A";
-    document.getElementById("server-offline").textContent = data.summary?.servers?.offline || "N/A";
-}
-
-
-
-
-
-
-
-
-
-
 const baseUrl = "http://localhost:80/api/regions";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -140,7 +67,28 @@ function updateSummary(data) {
     document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
     document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
     document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
+
+    // Update Cameras summary
+    document.getElementById("camera-total").textContent = data.summary?.cameras?.total || "N/A";
+    document.getElementById("camera-online").textContent = data.summary?.cameras?.online || "N/A";
+    document.getElementById("camera-offline").textContent = data.summary?.cameras?.offline || "N/A";
+
+    // Update Archivers summary
+    document.getElementById("archiver-total").textContent = data.summary?.archivers?.total || "N/A";
+    document.getElementById("archiver-online").textContent = data.summary?.archivers?.online || "N/A";
+    document.getElementById("archiver-offline").textContent = data.summary?.archivers?.offline || "N/A";
+
+    // Update Controllers summary
+    document.getElementById("controller-total").textContent = data.summary?.controllers?.total || "N/A";
+    document.getElementById("controller-online").textContent = data.summary?.controllers?.online || "N/A";
+    document.getElementById("controller-offline").textContent = data.summary?.controllers?.offline || "N/A";
+
+    // Update Servers summary
+    document.getElementById("server-total").textContent = data.summary?.servers?.total || "N/A";
+    document.getElementById("server-online").textContent = data.summary?.servers?.online || "N/A";
+    document.getElementById("server-offline").textContent = data.summary?.servers?.offline || "N/A";
 }
+
 
 function updateDetails(data) {
     const detailsContainer = document.getElementById("device-details");
@@ -193,3 +141,5 @@ function showModal(name, ip, location, status) {
     `;
     document.getElementById("modal").style.display = "block";
 }
+
+
