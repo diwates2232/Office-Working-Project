@@ -1,5 +1,3 @@
-index.html
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,38 +33,40 @@ index.html
                     <h3>Offline Devices</h3>
                     <p id="offline-devices">Loading...</p>
                 </div>
-            </div>
+            <!-- </div> -->
 
 
-            <div id="summary-section">
+            <!-- <div id="summary-section"> -->
+
              <div class="card">
                 <h3>Cameras</h3>
-                <p>Total: <span id="camera-total">N/A</span></p>
-                <p>Online: <span id="camera-online">N/A</span></p>
-                <p>Offline: <span id="camera-offline">N/A</span></p>
+                <p>Total: <span id="camera-total">Loading...</span></p>
+                <p>Online: <span id="camera-online">Loading...</span></p>
+                <p>Offline: <span id="camera-offline">Loading...</span></p>
                </div>
             
                <div class="card">
                 <h3>Archivers</h3>
-                <p>Total: <span id="archiver-total">N/A</span></p>
-                <p>Online: <span id="archiver-online">N/A</span></p>
-                <p>Offline: <span id="archiver-offline">N/A</span></p>
+                <p>Total: <span id="archiver-total">Loading...</span></p>
+                <p>Online: <span id="archiver-online">Loading...</span></p>
+                <p>Offline: <span id="archiver-offline">Loading...</span></p>
                </div>
             
                <div class="card">
                 <h3>Controllers</h3>
-                <p>Total: <span id="controller-total">N/A</span></p>
-                <p>Online: <span id="controller-online">N/A</span></p>
-                <p>Offline: <span id="controller-offline">N/A</span></p>
+                <p>Total: <span id="controller-total">Loading...</span></p>
+                <p>Online: <span id="controller-online">Loading...</span></p>
+                <p>Offline: <span id="controller-offline">Loading...</span></p>
                </div>
 
                <div class="card">
                 <h3>Servers</h3>
-                <p>Total: <span id="server-total">N/A</span></p>
-                <p>Online: <span id="server-online">N/A</span></p>
-                <p>Offline: <span id="server-offline">N/A</span></p>
+                <p>Total: <span id="server-total">Loading...</span></p>
+                <p>Online: <span id="server-online">Loading...</span></p>
+                <p>Offline: <span id="server-offline">Loading...</span></p>
                </div>
             </div>
+        
             
 
             <div id="details-section">
@@ -96,7 +96,7 @@ index.html
      <!-- Include Footer -->
               <footer class="footer">
                 <img src="images/FooterLogo.png" alt="Company Logo" class="footer-logo">
-                <p>&copy;2024 VisionWatch | Powered by <strong>Western Union Services India Pvt Ltd.</strong></p>
+                <p>&copy;2025 VisionWatch | Powered by <strong>Western Union Services India Pvt Ltd.</strong></p>
                 <p>Contact :
                 <a href="mailto:gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com">gsoc-globalsecurityoperationcenter.sharedmailbox@westernunion.com</a> |
                 <a href="tel:+91 20 67632394">+91 2067632394 </a>
@@ -115,33 +115,30 @@ body {
     margin: 0;
     padding: 0;
     display: flex;
+    flex-direction: column;
     height: 100vh;
     background-color: #f4f4f9;
 }
- 
-/* Container */
+
 .container {
     display: flex;
-    
     width: 100%;
+    flex-grow: 1;
 }
- 
-/* Sidebar */
+
 #sidebar {
     width: 20%;
     background-color: #222831;
-    margin: left 0;;
-    size: auto;
     color: white;
     padding: 20px;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
 }
- 
+
 #sidebar h2 {
     text-align: center;
     margin-bottom: 20px;
 }
- 
+
 .region-button {
     display: block;
     width: 100%;
@@ -156,73 +153,76 @@ body {
     border-radius: 5px;
     transition: background-color 0.3s ease;
 }
- 
+
 .region-button:hover {
     background-color: #007a80;
 }
- 
-/* Content */
+
 #content {
     width: 80%;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
- 
+
 #region-title {
     font-size: 24px;
     color: #333;
 }
- 
+
 .summary {
     display: flex;
     gap: 20px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     margin-top: 20px;
+    flex-wrap: wrap; /* Ensure they can wrap to next row */
 }
- 
+
 .card {
     background: white;
     margin-bottom: 20px;
-    padding: 15px;
+    
+    padding: 10;
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     text-align: center;
-    flex: 1;
+    flex: 1 1 calc(25% - 20px); /* Adjust this value for your card size */
 }
- 
+
 .card h3 {
     margin-bottom: 10px;
-    size-adjust: auto;
     color: #555;
 }
+
 #details-section {
     margin-top: 30px;
 }
- 
+
 #device-details {
     display: flex;
-    font-family: Arial, Helvetica, sans-serif;
     flex-wrap: wrap;
     gap: 15px;
 }
- 
+
 .device-card {
-    flex: 1 1 calc(33.333% - 10px);
+    flex: 1 1 calc(25% - 15px); /* Adjust this to your desired card size */
     background: white;
     padding: 10px;
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
- 
+
 .device-card h3 {
     margin-bottom: 10px;
     color: #333;
 }
- 
+
 .device-card p {
     font-size: 14px;
-    margin: 5px 0;font-family: Arial, Helvetica, sans-serif;
-    font-weight: 100;
+    margin: 5px 0;
 }
- 
+
 .details-button {
     display: inline-block;
     margin-top: 10px;
@@ -233,13 +233,11 @@ body {
     border-radius: 5px;
     cursor: pointer;
 }
- 
+
 .details-button:hover {
     background-color: #007a80;
 }
 
- 
-/* Modal */
 #modal {
     display: none;
     position: fixed;
@@ -253,11 +251,11 @@ body {
     box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
     z-index: 1000;
 }
- 
+
 .modal-content {
     position: relative;
 }
- 
+
 #close-modal {
     position: absolute;
     top: 10px;
@@ -266,36 +264,200 @@ body {
     cursor: pointer;
     color: #333;
 }
- 
+
 #modal-body {
     margin-top: 20px;
 }
- 
-.footer{
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 5px;
+}
+
+.footer {
     text-align: center;
     padding: 15px;
     background-color: #222;
-    color:#fff;
+    color: #fff;
     font-size: 14px;
     width: 100%;
-    position: fixed;
+    position: relative;
     bottom: 0;
-    box-shadow: 0 -2px 5px rgba(0, 0, 0,0.1);
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
 }
- 
-.footer-logo{
+
+.footer-logo {
     height: 40px;
     display: block;
     margin: 0 auto 10px;
 }
- 
-.footer a{
+
+.footer a {
     color: #ffcc00;
-    text-decoration:underline;
-}
-.footer a:hover{
     text-decoration: underline;
 }
-.footer strong{
+
+.footer a:hover {
+    text-decoration: underline;
+}
+
+.footer strong {
     color: #ffcc00;
+}
+
+
+
+
+
+Script.js
+
+const baseUrl = "http://localhost:80/api/regions";
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Fetch summary and details for the default region (global)
+    fetchSummary("global");
+    fetchDetails("global");
+
+    // Add event listeners to region buttons
+    const regionButtons = document.querySelectorAll(".region-button");
+    regionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const region = button.getAttribute("data-region");
+            document.getElementById("region-title").textContent = `${region.toUpperCase()} Summary`;
+            fetchSummary(region);
+            fetchDetails(region);
+        });
+    });
+
+    // Close modal on button click
+    document.getElementById("close-modal").addEventListener("click", () => {
+        document.getElementById("modal").style.display = "none";
+    });
+});
+
+function fetchSummary(regionName) {
+    const summaryUrl = `${baseUrl}/summary/${regionName}`;
+
+    fetch(summaryUrl)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Error fetching summary data from API.");
+            }
+            return response.json();
+        })
+        .then((summary) => {
+            console.log("Summary Data:", summary);
+            updateSummary(summary);
+        })
+        .catch((error) => {
+            console.error("Error fetching summary:", error);
+            alert("Failed to load summary data. Please check the console for details.");
+        });
+}
+
+function fetchDetails(regionName) {
+    const detailsUrl = `${baseUrl}/details/${regionName}`;
+
+    fetch(detailsUrl)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Error fetching details data from API.");
+            }
+            return response.json();
+        })
+        .then((details) => {
+            console.log("Details Data:", details);
+            updateDetails(details);
+        })
+        .catch((error) => {
+            console.error("Error fetching details:", error);
+            const detailsContainer = document.getElementById("device-details");
+            detailsContainer.innerHTML = "<p>Failed to load device details.</p>";
+        });
+}
+
+function updateSummary(data) {
+    document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
+    document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
+    document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
+
+    // Update Cameras summary
+    document.getElementById("camera-total").textContent = data.summary?.cameras?.total || "N/A";
+    document.getElementById("camera-online").textContent = data.summary?.cameras?.online || "N/A";
+    document.getElementById("camera-offline").textContent = data.summary?.cameras?.offline || "N/A";
+
+    // Update Archivers summary
+    document.getElementById("archiver-total").textContent = data.summary?.archivers?.total || "N/A";
+    document.getElementById("archiver-online").textContent = data.summary?.archivers?.online || "N/A";
+    document.getElementById("archiver-offline").textContent = data.summary?.archivers?.offline || "N/A";
+
+    // Update Controllers summary
+    document.getElementById("controller-total").textContent = data.summary?.controllers?.total || "N/A";
+    document.getElementById("controller-online").textContent = data.summary?.controllers?.online || "N/A";
+    document.getElementById("controller-offline").textContent = data.summary?.controllers?.offline || "N/A";
+
+    // Update Servers summary
+    document.getElementById("server-total").textContent = data.summary?.servers?.total || "N/A";
+    document.getElementById("server-online").textContent = data.summary?.servers?.online || "N/A";
+    document.getElementById("server-offline").textContent = data.summary?.servers?.offline || "N/A";
+}
+function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    detailsContainer.innerHTML = ""; // Clear old data
+
+    const offlineDevices = [];
+    const onlineDevices = [];
+
+    // Loop through each device type
+    for (const [key, devices] of Object.entries(data.details)) {
+        if (!Array.isArray(devices) || devices.length === 0) continue;
+
+        const deviceType = key.slice(0, -1).toUpperCase(); // e.g., "cameras" -> "CAMERA"
+
+        // Loop through each device in the current type
+        devices.forEach((device) => {
+            const card = document.createElement("div");
+            card.className = "device-card";
+
+            // Create a dot to represent the device status
+            const statusDot = document.createElement("span");
+            statusDot.className = "status-dot";
+            statusDot.style.backgroundColor = device.status === "Online" ? "green" : "red";
+
+            card.innerHTML = `
+                <h3>${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}</h3>
+                <p>DEVICE TYPE: ${deviceType}</p>
+                <p>IP: ${device.ip_address || "N/A"}</p>
+                <p>LOCATION: ${device.location || "N/A"}</p>
+                <p>Status: ${device.status || "Unknown"} ${statusDot.outerHTML}</p>
+                <button class="details-button" onclick="showModal('${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}', '${device.ip_address || "N/A"}', '${device.location || "N/A"}', '${device.status || "Unknown"}')">Details</button>
+            `;
+
+            if (device.status === "Online") {
+                onlineDevices.push(card);
+            } else {
+                offlineDevices.push(card);
+            }
+        });
+    }
+
+    // Append offline devices first, followed by online devices
+    [...offlineDevices, ...onlineDevices].forEach((deviceCard) => {
+        detailsContainer.appendChild(deviceCard);
+    });
+}
+
+
+function showModal(name, ip, location, status) {
+    document.getElementById("modal-title").textContent = `Details for ${name}`;
+    document.getElementById("modal-body").innerHTML = `
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>IP:</strong> ${ip}</li>
+        <li><strong>Location:</strong> ${location}</li>
+        <li><strong>Status:</strong> ${status}</li>
+    `;
+    document.getElementById("modal").style.display = "block";
 }
