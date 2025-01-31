@@ -1,4 +1,211 @@
+
+
 const baseUrl = "http://localhost:80/api/regions";
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Fetch summary and details for the default region (global) in parallel
+    Promise.all([fetchSummary("global"), fetchDetails("global")])
+        .then(() => {
+            console.log("Summary and details loaded.");
+        })
+        .catch((error) => {
+            console.error("Error fetching data:", error);
+            alert("Error loading initial data.");
+        });
+
+    // Add event listeners to region buttons
+    const regionButtons = document.querySelectorAll(".region-button");
+    regionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const region = button.getAttribute("data-region");
+            document.getElementById("region-title").textContent = `${region.toUpperCase()} Summary`;
+
+            // Fetch region data in parallel
+            Promise.all([fetchSummary(region), fetchDetails(region)])
+                .then(() => {
+                    console.log(`${region} data loaded.`);
+                })
+                .catch((error) => {
+                    console.error("Error fetching data:", error);
+                    alert(`Error loading ${region} data.`);
+                });
+        });
+    });
+
+    // Close modal on button click
+    document.getElementById("close-modal").addEventListener("click", () => {
+        document.getElementById("modal").style.display = "none";
+    });
+});
+
+// Utility function for making API calls with error handling
+async function fetchData(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Error fetching data from API: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        alert(error.message);
+    }
+}
+
+// Fetch summary data for a region
+async function fetchSummary(regionName) {
+    const summaryUrl = `${baseUrl}/summary/${regionName}`;
+    const data = await fetchData(summaryUrl);
+    if (data) {
+        console.log("Summary Data:", data);
+        updateSummary(data);
+    }
+}
+
+// Fetch details data for a region
+async function fetchDetails(regionName) {
+    const detailsUrl = `${baseUrl}/details/${regionName}`;
+    const data = await fetchData(detailsUrl);
+    if (data) {
+        console.log("Details Data:", data);
+        updateDetails(data);
+    }
+}
+
+// Update summary display on the UI
+function updateSummary(data) {
+    const summary = data.summary || {};
+
+    document.getElementById("total-devices").textContent = summary.totalDevices || "N/A";
+    document.getElementById("online-devices").textContent = summary.totalOnlineDevices || "N/A";
+    document.getElementById("offline-devices").textContent = summary.totalOfflineDevices || "N/A";
+
+    updateDeviceSummary("camera", summary.cameras);
+    updateDeviceSummary("archiver", summary.archivers);
+    updateDeviceSummary("controller", summary.controllers);
+    updateDeviceSummary("server", summary.servers);
+}
+
+// Helper to update device summary for each type
+function updateDeviceSummary(deviceType, data) {
+    document.getElementById(`${deviceType}-total`).textContent = data?.total || "N/A";
+    document.getElementById(`${deviceType}-online`).textContent = data?.online || "N/A";
+    document.getElementById(`${deviceType}-offline`).textContent = data?.offline || "N/A";
+}
+
+// Update details display on the UI
+function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    const deviceFilter = document.getElementById("device-filter");
+
+    detailsContainer.innerHTML = ""; // Clear old data
+
+    const allDevices = [];
+    const offlineDevices = [];
+    const onlineDevices = [];
+
+    // Create document fragment to batch append
+    const fragment = document.createDocumentFragment();
+
+    for (const [key, devices] of Object.entries(data.details)) {
+        if (!Array.isArray(devices) || devices.length === 0) continue;
+
+        const deviceType = key.toLowerCase(); // Convert to lowercase for comparison
+
+        devices.forEach((device) => {
+            const card = document.createElement("div");
+            card.className = "device-card";
+            card.dataset.type = deviceType;
+
+            const statusDot = createStatusDot(device.status);
+            card.innerHTML = `
+                <h3>${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}</h3>
+                <p>DEVICE TYPE: ${deviceType.toUpperCase()}</p>
+                <p>IP: ${device.ip_address || "N/A"}</p>
+                <p>LOCATION: ${device.location || "N/A"}</p>
+                <p>Status: ${device.status || "Unknown"} ${statusDot.outerHTML}</p>
+                <button class="details-button" onclick="showModal('${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}', '${device.ip_address || "N/A"}', '${device.location || "N/A"}', '${device.status || "Unknown"}')">Details</button>
+            `;
+
+            allDevices.push(card);
+            (device.status === "Online" ? onlineDevices : offlineDevices).push(card);
+        });
+    }
+
+    filterDevices(deviceFilter, allDevices, fragment);
+
+    // Append all filtered and sorted devices at once
+    [...offlineDevices, ...onlineDevices].forEach((deviceCard) => {
+        fragment.appendChild(deviceCard);
+    });
+
+    // Append the batch to the container
+    detailsContainer.appendChild(fragment);
+}
+
+// Create a status dot element
+function createStatusDot(status) {
+    const statusDot = document.createElement("span");
+    statusDot.className = "status-dot";
+    statusDot.style.backgroundColor = status === "Online" ? "green" : "red";
+    return statusDot;
+}
+
+// Function to filter devices based on selected type
+function filterDevices(deviceFilter, allDevices, detailsContainer) {
+    const selectedType = deviceFilter.value;
+    detailsContainer.innerHTML = ""; // Clear current display
+
+    const filteredDevices = allDevices.filter((device) =>
+        selectedType === "all" || device.dataset.type === selectedType
+    );
+
+    filteredDevices.forEach((deviceCard) => {
+        detailsContainer.appendChild(deviceCard);
+    });
+}
+
+// Debounce filtering to improve performance on input change
+let debounceTimer;
+document.getElementById("device-filter").addEventListener("input", (event) => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        const deviceFilter = event.target;
+        const detailsContainer = document.getElementById("device-details");
+        filterDevices(deviceFilter, [...detailsContainer.children], detailsContainer);
+    }, 300); // Debounce delay (300ms)
+});
+
+// Show device details in a modal
+function showModal(name, ip, location, status) {
+    document.getElementById("modal-title").textContent = `Details for ${name}`;
+    document.getElementById("modal-body").innerHTML = `
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>IP:</strong> ${ip}</li>
+        <li><strong>Location:</strong> ${location}</li>
+        <li><strong>Status:</strong> ${status}</li>
+    `;
+    document.getElementById("modal").style.display = "block";
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const baseUrl = "http://localhost:80/api/regions";
+
+
+
 
 document.addEventListener("DOMContentLoaded", () => {
     // Fetch summary and details for the default region (global)
