@@ -1,3 +1,104 @@
+function fetchData(regionName) {
+    const urlSummary = `${baseUrl}/summary/${regionName}`;
+    const urlDetails = `${baseUrl}/details/${regionName}`;
+
+    // Fetch summary and details in parallel
+    Promise.all([fetch(urlSummary), fetch(urlDetails)])
+        .then(([summaryResponse, detailsResponse]) => {
+            if (!summaryResponse.ok || !detailsResponse.ok) {
+                throw new Error("Error fetching data from API.");
+            }
+            return Promise.all([summaryResponse.json(), detailsResponse.json()]);
+        })
+        .then(([summaryData, detailsData]) => {
+            console.log("Fetched Summary:", summaryData);
+            console.log("Fetched Details:", detailsData);
+            updateSummary(summaryData);
+            updateDetails(detailsData);
+        })
+        .catch((error) => {
+            console.error("Error fetching data:", error);
+        });
+}
+
+
+
+
+function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    const fragment = document.createDocumentFragment(); // Create a document fragment
+
+    // Process and add devices to the fragment
+    data.details.forEach((device) => {
+        const deviceCard = document.createElement("div");
+        deviceCard.className = "device-card";
+        // Set content for the device card...
+        fragment.appendChild(deviceCard);
+    });
+
+    detailsContainer.appendChild(fragment); // Append all cards at once
+}
+
+
+
+
+let allData = null; // Global cache
+
+const loadExcelData = () => {
+    if (!allData) {
+        const archiverWorkbook = xlsx.readFile(archiverPath);
+        // Load and cache the data
+        allData = {
+            archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
+            // Load other data similarly...
+        };
+    }
+};
+
+// Call `loadExcelData()` only once
+loadExcelData();
+
+
+
+const fetchRegionData = async (regionName) => {
+    const devices = {
+        cameras: allData.cameras.filter((row) => row.location?.toLowerCase() === regionName.toLowerCase()),
+        // Filter other devices similarly...
+    };
+
+    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
+    const summary = calculateSummary(devices);
+
+    return { summary, details: devices };
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Script.js
 
 const baseUrl = "http://localhost:80/api/regions";
