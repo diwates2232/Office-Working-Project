@@ -1,394 +1,26 @@
-const xlsx = require("xlsx");
-const path = require("path");
-const ping = require("ping");
+const baseUrl = "http://localhost:80/api/regions";
 
-// Paths for Excel files
-const archiverPath = path.join(__dirname, "../data/ArchiverData.xlsx");
-const controllerPath = path.join(__dirname, "../data/ControllerData.xlsx");
-const cameraPath = path.join(__dirname, "../data/CameraData.xlsx");
-const serverPath = path.join(__dirname, "../data/ServerData.xlsx");
+document.addEventListener("DOMContentLoaded", () => {
+    // Fetch summary and details for the default region (global)
+    fetchSummary("global");
+    fetchDetails("global");
 
-// Cache to store preloaded data
-let allData = {};
-
-// Function to normalize column headers
-const normalizeHeaders = (data) => {
-    return data.map((row) => {
-        const normalizedRow = {};
-        for (const key in row) {
-            const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
-            normalizedRow[normalizedKey] = row[key];
-        }
-        return normalizedRow;
-    });
-};
-
-// Function to load Excel data into memory with error handling
-const loadExcelData = () => {
-    try {
-        const archiverWorkbook = xlsx.readFile(archiverPath);
-        const controllerWorkbook = xlsx.readFile(controllerPath);
-        const cameraWorkbook = xlsx.readFile(cameraPath);
-        const serverWorkbook = xlsx.readFile(serverPath);
-
-        allData = {
-            archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
-            controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
-            cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
-            servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
-        };
-    } catch (error) {
-        console.error("Error loading Excel data:", error.message);
-    }
-};
-
-// Function to compute global summary and details
-const fetchGlobalData = async () => {
-    const devices = {
-        cameras: allData.cameras || [],
-        archivers: allData.archivers || [],
-        controllers: allData.controllers || [],
-        servers: allData.servers || [],
-    };
-
-    // Ping all devices
-    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
-
-    const summary = calculateSummary(devices);
-    return { summary, details: devices };
-};
-
-// Function to compute region summary and details
-const fetchRegionData = async (regionName) => {
-    const devices = {
-        cameras: (allData.cameras || []).filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-        archivers: (allData.archivers || []).filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-        controllers: (allData.controllers || []).filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-        servers: (allData.servers || []).filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-    };
-
-    // Ping all devices
-    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
-
-    const summary = calculateSummary(devices);
-    return { summary, details: devices };
-};
-
-// Helper function to calculate detailed summary
-const calculateSummary = (devices) => {
-    const summary = {};
-
-    for (const [key, deviceList] of Object.entries(devices)) {
-        const total = deviceList.length;
-        const online = deviceList.filter(device => device.status === "Online").length;
-        const offline = total - online;
-
-        summary[key] = { total, online, offline };
-    }
-
-    return {
-        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
-        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
-        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
-        ...summary,
-    };
-};
-
-const pLimit = require("p-limit");
-
-const pingDevices = async (devices) => {
-    const limit = pLimit(10); // Limit to 10 concurrent pings
-    const pingPromises = devices.map((device) =>
-        limit(async () => {
-            const ipAddress = device.ip_address;
-            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
-        })
-    );
-
-    await Promise.all(pingPromises);
-};
-
-// Function to ping a single device
-const pingDevice = (ip) => {
-    return new Promise((resolve) => {
-        ping.sys.probe(ip, (isAlive) => {
-            resolve(isAlive ? "Online" : "Offline");
+    // Add event listeners to region buttons
+    const regionButtons = document.querySelectorAll(".region-button");
+    regionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const region = button.getAttribute("data-region");
+            document.getElementById("region-title").textContent = `${region.toUpperCase()} Summary`;
+            fetchSummary(region);
+            fetchDetails(region);
         });
     });
-};
 
-// Preload data
-loadExcelData();
-
-module.exports = { fetchGlobalData, fetchRegionData };
-
-
-
-
-
-
-
-
-
-
-
-const fetchRegionData = async (regionName) => {
-    console.log("Fetching data for region:", regionName);
-
-    if (!allData || typeof allData !== "object") {
-        throw new Error("allData is not loaded correctly.");
-    }
-
-    console.log("Checking structure of allData:", JSON.stringify(allData, null, 2));
-
-    const devices = {
-        cameras: Array.isArray(allData.cameras) ? allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
-        archivers: Array.isArray(allData.archivers) ? allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
-        controllers: Array.isArray(allData.controllers) ? allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
-        servers: Array.isArray(allData.servers) ? allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
-    };
-
-    console.log("Filtered Devices:", JSON.stringify(devices, null, 2)); // Debugging Step
-
-    // Check if any value in devices is not an array
-    for (const [key, value] of Object.entries(devices)) {
-        if (!Array.isArray(value)) {
-            console.error(`Error: ${key} is not an array. Its value:`, value);
-            throw new Error(`${key} is not an array.`);
-        }
-    }
-
-    // Ping all devices
-    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
-
-    const summary = calculateSummary(devices);
-    return { summary, details: devices };
-};
-
-
-
-
-
-allData = {
-    archivers: Array.isArray(archivers) ? archivers : [],
-    controllers: Array.isArray(controllers) ? controllers : [],
-    cameras: Array.isArray(cameras) ? cameras : [],
-    servers: Array.isArray(servers) ? servers : [],
-};
-
-
-
-
-
-
-
-
-
-
-
-
-const fetchRegionData = async (regionName) => {
-    const devices = {
-        cameras: Array.isArray(allData.cameras) 
-            ? allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) 
-            : [],
-        archivers: Array.isArray(allData.archivers) 
-            ? allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) 
-            : [],
-        controllers: Array.isArray(allData.controllers) 
-            ? allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) 
-            : [],
-        servers: Array.isArray(allData.servers) 
-            ? allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) 
-            : [],
-    };
-
-    // Ping all devices
-    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
-
-    const summary = calculateSummary(devices);
-    return { summary, details: devices };
-};
-
-
-
-
-
-
-
-
-const xlsx = require("xlsx");
-const path = require("path");
-const ping = require("ping");
-const pLimit = require("p-limit");
-
-// Paths for Excel files
-const archiverPath = path.join(__dirname, "../data/ArchiverData.xlsx");
-const controllerPath = path.join(__dirname, "../data/ControllerData.xlsx");
-const cameraPath = path.join(__dirname, "../data/CameraData.xlsx");
-const serverPath = path.join(__dirname, "../data/ServerData.xlsx");
-
-// Cache to store preloaded data
-let allData = {};
-
-// Function to normalize column headers
-const normalizeHeaders = (data) => {
-    return data.map((row) => {
-        const normalizedRow = {};
-        for (const key in row) {
-            const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
-            normalizedRow[normalizedKey] = row[key];
-        }
-        return normalizedRow;
+    // Close modal on button click
+    document.getElementById("close-modal").addEventListener("click", () => {
+        document.getElementById("modal").style.display = "none";
     });
-};
-
-// Function to load Excel data into memory
-const loadExcelData = () => {
-    console.log("Loading Excel data...");
-    try {
-        allData = {
-            archivers: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(archiverPath).Sheets["Sheet1"])),
-            controllers: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(controllerPath).Sheets["Sheet1"])),
-            cameras: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(cameraPath).Sheets["Sheet1"])),
-            servers: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(serverPath).Sheets["Sheet1"])),
-        };
-        console.log("Excel data loaded successfully.");
-    } catch (error) {
-        console.error("Error loading Excel data:", error);
-    }
-};
-
-// **Auto-refresh Excel data every 5 minutes**
-setInterval(loadExcelData, 5 * 60 * 1000);
-
-// Function to fetch global data
-const fetchGlobalData = async () => {
-    const devices = { ...allData };
-
-    // Ping only once per refresh
-    if (!devices.pinged) {
-        await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
-        devices.pinged = true; // Mark as pinged
-    }
-
-    return { summary: calculateSummary(devices), details: devices };
-};
-
-// Function to fetch region data
-const fetchRegionData = async (regionName) => {
-    const devices = {
-        cameras: allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-        archivers: allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-        controllers: allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-        servers: allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
-    };
-
-    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
-    return { summary: calculateSummary(devices), details: devices };
-};
-
-// Function to calculate summary
-const calculateSummary = (devices) => {
-    const summary = {};
-
-    for (const [key, deviceList] of Object.entries(devices)) {
-        const total = deviceList.length;
-        const online = deviceList.filter(device => device.status === "Online").length;
-        summary[key] = { total, online, offline: total - online };
-    }
-
-    return {
-        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
-        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
-        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
-        ...summary,
-    };
-};
-
-// Optimize Pinging Devices (Limit concurrency)
-const pingDevices = async (devices) => {
-    const limit = pLimit(10); // Ping max 10 at a time
-    const pingPromises = devices.map((device) =>
-        limit(async () => {
-            const ipAddress = device.ip_address;
-            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
-        })
-    );
-    await Promise.all(pingPromises);
-};
-
-// Function to ping a single device
-const pingDevice = (ip) => {
-    return new Promise((resolve) => {
-        ping.sys.probe(ip, (isAlive) => {
-            resolve(isAlive ? "Online" : "Offline");
-        });
-    });
-};
-
-// **Preload data on startup**
-loadExcelData();
-
-module.exports = { fetchGlobalData, fetchRegionData };
-
-
-
-
-
-
-
-
-
-
-
-
-const express = require("express");
-const { getGlobalData, getRegionData } = require("../controllers/regionControllers");
-
-const router = express.Router();
-
-// Single API for global data (summary + details)
-router.get("/global", getGlobalData);
-
-// Single API for region data (summary + details)
-router.get("/:regionName", getRegionData);
-
-module.exports = router;
-
-
-
-
-
-
-
-const { fetchGlobalData, fetchRegionData } = require("../services/excelService");
-
-// Unified Controller for Global Data
-const getGlobalData = async (req, res) => {
-    try {
-        const data = await fetchGlobalData();
-        res.status(200).json(data);
-    } catch (error) {
-        res.status(500).json({ error: "Internal server error", details: error.message });
-    }
-};
-
-// Unified Controller for Region Data
-const getRegionData = async (req, res) => {
-    try {
-        const { regionName } = req.params;
-        const data = await fetchRegionData(regionName);
-        res.status(200).json(data);
-    } catch (error) {
-        res.status(500).json({ error: "Internal server error", details: error.message });
-    }
-};
-
-module.exports = { getGlobalData, getRegionData };
-
-
-
+});
 
 
 
@@ -406,3 +38,163 @@ function fetchData(regionName) {
             console.error("Error fetching data:", error);
         });
 }
+
+
+
+function fetchSummary(regionName) {
+    const summaryUrl = `${baseUrl}/summary/${regionName}`;
+
+    fetch(summaryUrl)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Error fetching summary data from API.");
+            }
+            return response.json();
+        })
+        .then((summary) => {
+            console.log("Summary Data:", summary);
+            updateSummary(summary);
+        })
+        .catch((error) => {
+            console.error("Error fetching summary:", error);
+            alert("Failed to load summary data. Please check the console for details.");
+        });
+}
+
+function fetchDetails(regionName) {
+    const detailsUrl = `${baseUrl}/details/${regionName}`;
+
+    fetch(detailsUrl)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Error fetching details data from API.");
+            }
+            return response.json();
+        })
+        .then((details) => {
+            console.log("Details Data:", details);
+            updateDetails(details);
+        })
+        .catch((error) => {
+            console.error("Error fetching details:", error);
+            const detailsContainer = document.getElementById("device-details");
+            detailsContainer.innerHTML = "<p>Failed to load device details.</p>";
+        });
+}
+
+
+
+function updateSummary(data) {
+    document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
+    document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
+    document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
+
+    // Update Cameras summary
+    document.getElementById("camera-total").textContent = data.summary?.cameras?.total || "N/A";
+    document.getElementById("camera-online").textContent = data.summary?.cameras?.online || "N/A";
+    document.getElementById("camera-offline").textContent = data.summary?.cameras?.offline || "N/A";
+
+    // Update Archivers summary
+    document.getElementById("archiver-total").textContent = data.summary?.archivers?.total || "N/A";
+    document.getElementById("archiver-online").textContent = data.summary?.archivers?.online || "N/A";
+    document.getElementById("archiver-offline").textContent = data.summary?.archivers?.offline || "N/A";
+
+    // Update Controllers summary
+    document.getElementById("controller-total").textContent = data.summary?.controllers?.total || "N/A";
+    document.getElementById("controller-online").textContent = data.summary?.controllers?.online || "N/A";
+    document.getElementById("controller-offline").textContent = data.summary?.controllers?.offline || "N/A";
+
+    // Update Servers summary
+    document.getElementById("server-total").textContent = data.summary?.servers?.total || "N/A";
+    document.getElementById("server-online").textContent = data.summary?.servers?.online || "N/A";
+    document.getElementById("server-offline").textContent = data.summary?.servers?.offline || "N/A";
+}
+
+function updateDetails(data) {
+        const detailsContainer = document.getElementById("device-details");
+        const deviceFilter = document.getElementById("device-filter");
+    
+        detailsContainer.innerHTML = ""; // Clear old data
+    
+        const offlineDevices = [];
+        const onlineDevices = [];
+    
+        // Store all devices
+        let allDevices = [];
+    
+        // Loop through each device type
+        for (const [key, devices] of Object.entries(data.details)) {
+            if (!Array.isArray(devices) || devices.length === 0) continue;
+    
+            const deviceType = key.toLowerCase(); // Convert to lowercase for comparison
+    
+            devices.forEach((device) => {
+                const card = document.createElement("div");
+                card.className = "device-card";
+                card.dataset.type = deviceType; // Store type for filtering
+    
+                // Create a status dot
+                const statusDot = document.createElement("span");
+                statusDot.className = "status-dot";
+                statusDot.style.backgroundColor = device.status === "Online" ? "green" : "red";
+    
+                card.innerHTML = `
+                    <h3>${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}</h3>
+                    <p>DEVICE TYPE: ${deviceType.toUpperCase()}</p>
+                    <p>IP: ${device.ip_address || "N/A"}</p>
+                    <p>LOCATION: ${device.location || "N/A"}</p>
+                    <p>Status: ${device.status || "Unknown"} ${statusDot.outerHTML}</p>
+                    <button class="details-button" onclick="showModal('${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}', '${device.ip_address || "N/A"}', '${device.location || "N/A"}', '${device.status || "Unknown"}')">Details</button>
+                `;
+    
+                allDevices.push(card);
+                if (device.status === "Online") {
+                    onlineDevices.push(card);
+                } else {
+                    offlineDevices.push(card);
+                }
+            });
+        }
+
+ // Function to filter devices
+        function filterDevices() {
+            const selectedType = deviceFilter.value;
+            detailsContainer.innerHTML = ""; // Clear current display
+    
+            const filteredDevices = allDevices.filter((device) =>
+                selectedType === "all" || device.dataset.type === selectedType
+            );
+    
+            filteredDevices.forEach((deviceCard) => {
+                detailsContainer.appendChild(deviceCard);
+            });
+        }
+    
+        // Initially display all devices
+        filterDevices();
+    
+        // Add event listener to dropdown
+        deviceFilter.addEventListener("change", filterDevices);
+    
+    
+
+    // Append offline devices first, followed by online devices
+    [...offlineDevices, ...onlineDevices].forEach((deviceCard) => {
+        detailsContainer.appendChild(deviceCard);
+    });
+}
+
+
+function showModal(name, ip, location, status) {
+    document.getElementById("modal-title").textContent = `Details for ${name}`;
+    document.getElementById("modal-body").innerHTML = `
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>IP:</strong> ${ip}</li>
+        <li><strong>Location:</strong> ${location}</li>
+        <li><strong>Status:</strong> ${status}</li>
+    `;
+    document.getElementById("modal").style.display = "block";
+}
+
+
+
