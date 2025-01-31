@@ -1,3 +1,46 @@
+const fetchRegionData = async (regionName) => {
+    console.log("Fetching data for region:", regionName);
+
+    if (!allData || typeof allData !== "object") {
+        throw new Error("allData is not loaded correctly.");
+    }
+
+    console.log("Checking structure of allData:", JSON.stringify(allData, null, 2));
+
+    const devices = {
+        cameras: Array.isArray(allData.cameras) ? allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
+        archivers: Array.isArray(allData.archivers) ? allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
+        controllers: Array.isArray(allData.controllers) ? allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
+        servers: Array.isArray(allData.servers) ? allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()) : [],
+    };
+
+    console.log("Filtered Devices:", JSON.stringify(devices, null, 2)); // Debugging Step
+
+    // Check if any value in devices is not an array
+    for (const [key, value] of Object.entries(devices)) {
+        if (!Array.isArray(value)) {
+            console.error(`Error: ${key} is not an array. Its value:`, value);
+            throw new Error(`${key} is not an array.`);
+        }
+    }
+
+    // Ping all devices
+    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
+
+    const summary = calculateSummary(devices);
+    return { summary, details: devices };
+};
+
+
+
+
+
+allData = {
+    archivers: Array.isArray(archivers) ? archivers : [],
+    controllers: Array.isArray(controllers) ? controllers : [],
+    cameras: Array.isArray(cameras) ? cameras : [],
+    servers: Array.isArray(servers) ? servers : [],
+};
 
 
 
