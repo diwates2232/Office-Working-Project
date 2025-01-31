@@ -1,1 +1,190 @@
 
+const xlsx = require("xlsx");
+const path = require("path");
+const ping = require("ping");
+const pLimit = require("p-limit");
+
+// Paths for Excel files
+const archiverPath = path.join(__dirname, "../data/ArchiverData.xlsx");
+const controllerPath = path.join(__dirname, "../data/ControllerData.xlsx");
+const cameraPath = path.join(__dirname, "../data/CameraData.xlsx");
+const serverPath = path.join(__dirname, "../data/ServerData.xlsx");
+
+// Cache to store preloaded data
+let allData = {};
+
+// Function to normalize column headers
+const normalizeHeaders = (data) => {
+    return data.map((row) => {
+        const normalizedRow = {};
+        for (const key in row) {
+            const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+            normalizedRow[normalizedKey] = row[key];
+        }
+        return normalizedRow;
+    });
+};
+
+// Function to load Excel data into memory
+const loadExcelData = () => {
+    console.log("Loading Excel data...");
+    try {
+        allData = {
+            archivers: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(archiverPath).Sheets["Sheet1"])),
+            controllers: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(controllerPath).Sheets["Sheet1"])),
+            cameras: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(cameraPath).Sheets["Sheet1"])),
+            servers: normalizeHeaders(xlsx.utils.sheet_to_json(xlsx.readFile(serverPath).Sheets["Sheet1"])),
+        };
+        console.log("Excel data loaded successfully.");
+    } catch (error) {
+        console.error("Error loading Excel data:", error);
+    }
+};
+
+// **Auto-refresh Excel data every 5 minutes**
+setInterval(loadExcelData, 5 * 60 * 1000);
+
+// Function to fetch global data
+const fetchGlobalData = async () => {
+    const devices = { ...allData };
+
+    // Ping only once per refresh
+    if (!devices.pinged) {
+        await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
+        devices.pinged = true; // Mark as pinged
+    }
+
+    return { summary: calculateSummary(devices), details: devices };
+};
+
+// Function to fetch region data
+const fetchRegionData = async (regionName) => {
+    const devices = {
+        cameras: allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+        archivers: allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+        controllers: allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+        servers: allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+    };
+
+    await pingDevices([...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers]);
+    return { summary: calculateSummary(devices), details: devices };
+};
+
+// Function to calculate summary
+const calculateSummary = (devices) => {
+    const summary = {};
+
+    for (const [key, deviceList] of Object.entries(devices)) {
+        const total = deviceList.length;
+        const online = deviceList.filter(device => device.status === "Online").length;
+        summary[key] = { total, online, offline: total - online };
+    }
+
+    return {
+        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
+        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
+        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
+        ...summary,
+    };
+};
+
+// Optimize Pinging Devices (Limit concurrency)
+const pingDevices = async (devices) => {
+    const limit = pLimit(10); // Ping max 10 at a time
+    const pingPromises = devices.map((device) =>
+        limit(async () => {
+            const ipAddress = device.ip_address;
+            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+        })
+    );
+    await Promise.all(pingPromises);
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// **Preload data on startup**
+loadExcelData();
+
+module.exports = { fetchGlobalData, fetchRegionData };
+
+
+
+
+
+
+
+
+
+
+
+
+const express = require("express");
+const { getGlobalData, getRegionData } = require("../controllers/regionControllers");
+
+const router = express.Router();
+
+// Single API for global data (summary + details)
+router.get("/global", getGlobalData);
+
+// Single API for region data (summary + details)
+router.get("/:regionName", getRegionData);
+
+module.exports = router;
+
+
+
+
+
+
+
+const { fetchGlobalData, fetchRegionData } = require("../services/excelService");
+
+// Unified Controller for Global Data
+const getGlobalData = async (req, res) => {
+    try {
+        const data = await fetchGlobalData();
+        res.status(200).json(data);
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+// Unified Controller for Region Data
+const getRegionData = async (req, res) => {
+    try {
+        const { regionName } = req.params;
+        const data = await fetchRegionData(regionName);
+        res.status(200).json(data);
+    } catch (error) {
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+module.exports = { getGlobalData, getRegionData };
+
+
+
+
+
+
+function fetchData(regionName) {
+    const url = `${baseUrl}/${regionName}`;
+
+    fetch(url)
+        .then((response) => response.json())
+        .then((data) => {
+            console.log("Fetched Data:", data);
+            updateSummary(data.summary);
+            updateDetails(data.details);
+        })
+        .catch((error) => {
+            console.error("Error fetching data:", error);
+        });
+}
