@@ -1,3 +1,114 @@
+const loadExcelData = () => {
+    if (Object.keys(allData).length === 0) { // Load only if not already loaded
+        const archiverWorkbook = xlsx.readFile(archiverPath);
+        const controllerWorkbook = xlsx.readFile(controllerPath);
+        const cameraWorkbook = xlsx.readFile(cameraPath);
+        const serverWorkbook = xlsx.readFile(serverPath);
+
+        allData = {
+            archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
+            controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
+            cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
+            servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
+        };
+        console.log("Excel Data Loaded.");
+    }
+};
+
+
+const cache = new Map(); // Stores device status temporarily
+
+const pingDevices = async (devices) => {
+    const limit = pLimit(10); // Reduce concurrent ping requests to 10
+    const pingPromises = devices.map((device) =>
+        limit(async () => {
+            const ipAddress = device.ip_address;
+            if (cache.has(ipAddress)) {
+                device.status = cache.get(ipAddress); // Use cached status
+            } else {
+                device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+                cache.set(ipAddress, device.status); // Store result in cache
+            }
+        })
+    );
+
+    await Promise.all(pingPromises);
+};
+
+
+
+
+function fetchData(regionName) {
+    const summaryUrl = `${baseUrl}/summary/${regionName}`;
+    const detailsUrl = `${baseUrl}/details/${regionName}`;
+
+    Promise.all([
+        fetch(summaryUrl).then((res) => res.json()),
+        fetch(detailsUrl).then((res) => res.json())
+    ])
+    .then(([summary, details]) => {
+        console.log("Summary Data:", summary);
+        console.log("Details Data:", details);
+        updateSummary(summary);
+        updateDetails(details);
+    })
+    .catch((error) => {
+        console.error("Error fetching data:", error);
+    });
+}
+
+
+
+function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    detailsContainer.innerHTML = ""; // Clear old data
+
+    const allDevices = [];
+
+    Object.entries(data.details).forEach(([type, devices]) => {
+        devices.forEach((device) => {
+            const card = document.createElement("div");
+            card.className = "device-card";
+            card.dataset.type = type.toLowerCase();
+
+            const statusDot = document.createElement("span");
+            statusDot.className = "status-dot";
+            statusDot.style.backgroundColor = device.status === "Online" ? "green" : "red";
+
+            card.innerHTML = `
+                <h3>${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}</h3>
+                <p>DEVICE TYPE: ${type.toUpperCase()}</p>
+                <p>IP: ${device.ip_address || "N/A"}</p>
+                <p>LOCATION: ${device.location || "N/A"}</p>
+                <p>Status: ${device.status || "Unknown"} ${statusDot.outerHTML}</p>
+            `;
+
+            allDevices.push(card);
+        });
+    });
+
+    // Display first 50 devices and add "Load More" button
+    const initialLoad = 50;
+    allDevices.slice(0, initialLoad).forEach(card => detailsContainer.appendChild(card));
+
+    if (allDevices.length > initialLoad) {
+        const loadMoreBtn = document.createElement("button");
+        loadMoreBtn.textContent = "Load More";
+        loadMoreBtn.className = "load-more-btn";
+        loadMoreBtn.addEventListener("click", () => {
+            allDevices.slice(initialLoad).forEach(card => detailsContainer.appendChild(card));
+            loadMoreBtn.remove(); // Remove button after loading all devices
+        });
+        detailsContainer.appendChild(loadMoreBtn);
+    }
+}
+
+
+
+
+
+
+
 
 Script.js
 
