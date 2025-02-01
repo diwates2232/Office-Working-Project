@@ -1,3 +1,68 @@
+let refreshInterval = 300000; // 5 minutes (300,000 ms)
+let countdownTime = refreshInterval / 1000; // Convert to seconds
+
+function fetchData(regionName) {
+    const summaryUrl = `${baseUrl}/summary/${regionName}`;
+    const detailsUrl = `${baseUrl}/details/${regionName}`;
+
+    Promise.all([
+        fetch(summaryUrl).then((res) => res.json()),
+        fetch(detailsUrl).then((res) => res.json())
+    ])
+    .then(([summary, details]) => {
+        console.log("Summary Data:", summary);
+        console.log("Details Data:", details);
+        updateSummary(summary);
+        updateDetails(details);
+    })
+    .catch((error) => {
+        console.error("Error fetching data:", error);
+    });
+}
+
+// Function to start auto-refresh with a countdown
+function startAutoRefresh(regionName) {
+    fetchData(regionName); // Fetch data initially
+
+    // Countdown Timer Display
+    const countdownDisplay = document.getElementById("countdown");
+    function updateCountdown() {
+        countdownDisplay.innerText = `Refreshing in ${countdownTime} seconds`;
+        countdownTime--;
+        if (countdownTime < 0) countdownTime = refreshInterval / 1000;
+    }
+    
+    // Start countdown every second
+    setInterval(updateCountdown, 1000);
+
+    // Refresh data every 5 minutes
+    setInterval(() => {
+        fetchData(regionName); // Fetch fresh data
+        countdownTime = refreshInterval / 1000; // Reset countdown
+    }, refreshInterval);
+}
+
+// Call function with the selected region when the page loads
+document.addEventListener("DOMContentLoaded", () => {
+    let regionName = "Global"; // Default region
+    startAutoRefresh(regionName);
+});
+
+
+<div id="countdown" style="font-size: 16px; font-weight: bold; color: #ff0000;"></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
 const loadExcelData = () => {
     if (Object.keys(allData).length === 0) { // Load only if not already loaded
         const archiverWorkbook = xlsx.readFile(archiverPath);
