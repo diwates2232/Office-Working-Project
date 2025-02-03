@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -5,7 +6,8 @@ const bodyParser = require("body-parser");
 const regionRoutes = require("./routes/regionRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 80;
+
 
 // Middleware
 // Configure CORS correctly
@@ -28,7 +30,11 @@ app.use((err, req, res, next) => {
   res.status(500).send("Something went wrong!");
 });
 
+
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
