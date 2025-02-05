@@ -1,1 +1,131 @@
+const allowedOrigins = process.env.CORS_ORIGIN || "http://127.0.0.1:5501";
+
+app.use(cors({
+    origin: allowedOrigins.split(","), // Support multiple origins
+    methods: "GET,POST,PUT,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+}));
+
+
+
+
+const devices = require("./config/devices.json"); // Store devices in a JSON file
+
+app.get("/api/ping/:ip", async (req, res) => {
+    const ip = req.params.ip;
+    if (!ip || !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+        return res.status(400).json({ error: "Invalid IP address format." });
+    }
+    try {
+        const result = await ping.promise.probe(ip);
+        res.json({ ip, status: result.alive ? "Online" : "Offline" });
+    } catch (error) {
+        console.error(`Ping error for ${ip}:`, error);
+        res.status(500).json({ ip, status: "Offline", error: error.message });
+    }
+});
+
+
+
+
+
+
+
+const fs = require("fs");
+
+const loadExcelData = () => {
+    const filePaths = { archiverPath, controllerPath, cameraPath, serverPath };
+
+    for (const [key, filePath] of Object.entries(filePaths)) {
+        if (!fs.existsSync(filePath)) {
+            console.error(`Error: Missing Excel file at ${filePath}`);
+            return;
+        }
+    }
+
+    const archiverWorkbook = xlsx.readFile(archiverPath);
+    const controllerWorkbook = xlsx.readFile(controllerPath);
+    const cameraWorkbook = xlsx.readFile(cameraPath);
+    const serverWorkbook = xlsx.readFile(serverPath);
+
+    allData = {
+        archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
+        controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
+        cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
+        servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
+    };
+
+    console.log("Excel Data Loaded.");
+};
+
+
+
+const cache = new Map();
+
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        if (cache.has(ip)) {
+            resolve(cache.get(ip));
+        } else {
+            ping.sys.probe(ip, (isAlive) => {
+                const status = isAlive ? "Online" : "Offline";
+                cache.set(ip, status);
+                setTimeout(() => cache.delete(ip), 60000); // Cache expires in 1 minute
+                resolve(status);
+            });
+        }
+    });
+};
+
+
+
+
+
+router.get("/summary/:regionName", (req, res, next) => {
+    const { regionName } = req.params;
+    if (!regionName || typeof regionName !== "string") {
+        return res.status(400).json({ error: "Invalid region name." });
+    }
+    next();
+});
+
+
+
+
+
+let globalDataCache = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 60000; // 1 minute
+
+const getGlobalSummary = async (req, res) => {
+    try {
+        const now = Date.now();
+        if (!globalDataCache || now - lastFetchTime > CACHE_DURATION) {
+            globalDataCache = await fetchGlobalData();
+            lastFetchTime = now;
+        }
+        res.status(200).json({ summary: globalDataCache.summary });
+    } catch (error) {
+        console.error("Error fetching global summary:", error);
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+
+const getRegionSummary = async (req, res) => {
+    const { regionName } = req.params;
+    try {
+        if (!regionName) throw new Error("Region name is required.");
+        const regionData = await fetchRegionData(regionName);
+        res.status(200).json({ summary: regionData.summary });
+    } catch (error) {
+        console.error(`Error fetching region summary for ${regionName}:`, error);
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};
+
+
+
+
+
 
