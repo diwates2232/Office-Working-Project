@@ -19,5 +19,3 @@ router.get("/summary/:regionName", getRegionSummary);
 router.get("/details/:regionName", getRegionDetails);
 
 module.exports = router;
-
-
