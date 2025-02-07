@@ -23,22 +23,25 @@ const normalizeHeaders = (data) => {
         return normalizedRow;
     });
 };
- //----------------------------------------------------------------------------------------
-// Function to load Excel data into memory
 
 const loadExcelData = () => {
-    const archiverWorkbook = xlsx.readFile(archiverPath);
-    const controllerWorkbook = xlsx.readFile(controllerPath);
-    const cameraWorkbook = xlsx.readFile(cameraPath);
-    const serverWorkbook = xlsx.readFile(serverPath);
+    if (Object.keys(allData).length === 0) { // Load only if not already loaded
+        const archiverWorkbook = xlsx.readFile(archiverPath);
+        const controllerWorkbook = xlsx.readFile(controllerPath);
+        const cameraWorkbook = xlsx.readFile(cameraPath);
+        const serverWorkbook = xlsx.readFile(serverPath);
 
-    allData = {
-        archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
-        controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
-        cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
-        servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
-    };
+        allData = {
+            archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
+            controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
+            cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
+            servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
+        };
+        console.log("Excel Data Loaded.");
+    }
 };
+
+
 
 // Function to compute global summary and details
 
@@ -93,19 +96,28 @@ const calculateSummary = (devices) => {
     };
 };
 
+
 const pLimit = require("p-limit");
 
+const cache = new Map(); // Stores device status temporarily
+
 const pingDevices = async (devices) => {
-    const limit = pLimit(10); // Limit to 10 concurrent pings
+    const limit = pLimit(10); // Reduce concurrent ping requests to 10
     const pingPromises = devices.map((device) =>
         limit(async () => {
             const ipAddress = device.ip_address;
-            device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+            if (cache.has(ipAddress)) {
+                device.status = cache.get(ipAddress); // Use cached status
+            } else {
+                device.status = ipAddress ? await pingDevice(ipAddress) : "IP Address Missing";
+                cache.set(ipAddress, device.status); // Store result in cache
+            }
         })
     );
 
     await Promise.all(pingPromises);
 };
+
 
 // Function to ping a single device
 const pingDevice = (ip) => {
