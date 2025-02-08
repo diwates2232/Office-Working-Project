@@ -5,6 +5,158 @@ const bodyParser = require("body-parser");
 const fs = require("fs");
 const path = require("path");
 const ping = require("ping");
+const xlsx = require("xlsx");
+
+const regionRoutes = require("./routes/regionRoutes");
+
+const app = express();
+const PORT = process.env.PORT || 80;
+
+// Middleware
+app.use(cors({
+  origin: "http://127.0.0.1:5501", // Match your frontend's origin
+  methods: "GET,POST,PUT,DELETE",
+  allowedHeaders: "Content-Type,Authorization",
+}));
+app.use(bodyParser.json());
+
+// File path for downtime logs
+const downtimeFile = path.join(__dirname, "data", "downtimeLogs.json");
+let downtimeLogs = {};
+
+// Load existing downtime data when the server starts
+if (fs.existsSync(downtimeFile)) {
+  downtimeLogs = JSON.parse(fs.readFileSync(downtimeFile, "utf-8"));
+} else {
+  fs.writeFileSync(downtimeFile, JSON.stringify({}, null, 2)); // Create file if missing
+}
+
+// 📌 **Function to Read Device IPs from ALL Excel Files**
+function loadAllDeviceIPs() {
+  const excelFiles = [
+    "ArchiverData.xlsx",
+    "CameraData.xlsx",
+    "ControllerData.xlsx",
+    "ServerData.xlsx"
+  ];
+  
+  let allDevices = [];
+
+  for (const file of excelFiles) {
+    const filePath = path.join(__dirname, "src", "data", file);
+    
+    if (fs.existsSync(filePath)) {
+      const workbook = xlsx.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const jsonData = xlsx.utils.sheet_to_json(sheet);
+      
+      // Extract IP column (assuming "IP" is the column name)
+      const ips = jsonData.map(row => row.IP).filter(ip => ip);
+      allDevices = allDevices.concat(ips);
+    } else {
+      console.warn(`⚠️ Warning: ${file} not found.`);
+    }
+  }
+
+  return allDevices;
+}
+
+// **Load Device List from All Excel Files**
+let devices = loadAllDeviceIPs();
+let deviceStatus = {};
+
+// Function to log downtime
+function logDowntime(ip, status) {
+  const now = new Date().toISOString();
+  
+  if (status === "Offline") {
+    if (!downtimeLogs[ip] || downtimeLogs[ip].endTime) {
+      downtimeLogs[ip] = { startTime: now, endTime: null };
+    }
+  } else {
+    if (downtimeLogs[ip] && !downtimeLogs[ip].endTime) {
+      downtimeLogs[ip].endTime = now;
+    }
+  }
+
+  // Save the updated downtime log
+  fs.writeFileSync(downtimeFile, JSON.stringify(downtimeLogs, null, 2));
+}
+
+// Function to continuously ping devices
+async function pingDevices() {
+  for (const ip of devices) {
+    try {
+      const result = await ping.promise.probe(ip);
+      const newStatus = result.alive ? "Online" : "Offline";
+
+      if (deviceStatus[ip] !== newStatus) {
+        console.log(`[${new Date().toISOString()}] ${ip} changed status: ${newStatus}`);
+        logDowntime(ip, newStatus);
+      }
+
+      deviceStatus[ip] = newStatus;
+    } catch (error) {
+      console.error(`Error pinging ${ip}:`, error);
+      logDowntime(ip, "Offline");
+      deviceStatus[ip] = "Offline";
+    }
+  }
+  console.log("Updated device status:", JSON.stringify(deviceStatus, null, 2));
+}
+
+// Ping devices every 30 seconds
+setInterval(pingDevices, 30000);
+
+// API to get real-time status of all devices
+app.get("/api/devices/status", (req, res) => {
+  res.json(deviceStatus);
+});
+
+// API to get downtime logs
+app.get("/api/devices/downtime", (req, res) => {
+  res.json(downtimeLogs);
+});
+
+// Ping a specific device dynamically
+app.get("/api/ping/:ip", async (req, res) => {
+  const ip = req.params.ip;
+  
+  try {
+    const result = await ping.promise.probe(ip);
+    res.json({ ip, status: result.alive ? "Online" : "Offline" });
+  } catch (error) {
+    console.error(`Ping error for ${ip}:`, error);
+    res.json({ ip, status: "Offline" });
+  }
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  devices = loadAllDeviceIPs();  // Reload device list from all Excel files
+  console.log(`📌 Monitoring ${devices.length} devices.`);
+  pingDevices(); // Start pinging devices immediately
+});
+
+
+
+
+
+
+
+
+
+
+
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const fs = require("fs");
+const path = require("path");
+const ping = require("ping");
 const regionRoutes = require("./routes/regionRoutes");
 
 const app = express();
