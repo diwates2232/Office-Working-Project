@@ -1,4 +1,135 @@
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const fs = require("fs");
+const path = require("path");
+const ping = require("ping");
+const xlsx = require("xlsx");
 
+const app = express();
+const PORT = process.env.PORT || 80;
+
+// Middleware
+app.use(
+  cors({
+    origin: "http://127.0.0.1:5501", // Adjust based on frontend
+    methods: "GET,POST,PUT,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+  })
+);
+app.use(bodyParser.json());
+
+// File paths
+const dataFolder = path.join(__dirname, "data");
+const downtimeFile = path.join(dataFolder, "downtimeLogs.json");
+
+// Ensure the data folder exists
+if (!fs.existsSync(dataFolder)) {
+  console.error(`❌ Data folder not found: ${dataFolder}`);
+  process.exit(1);
+}
+
+// Load Excel Files
+const excelFiles = ["ArchiverData.xlsx", "CameraData.xlsx", "ControllerData.xlsx", "ServerData.xlsx"];
+let devices = [];
+
+excelFiles.forEach((file) => {
+  const filePath = path.join(dataFolder, file);
+  
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️ Warning: ${file} not found.`);
+    return;
+  }
+
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+  data.forEach((row) => {
+    if (row.Ip_address) {
+      devices.push(row.Ip_address.trim());
+    }
+  });
+});
+
+if (devices.length === 0) {
+  console.error("❌ No devices loaded from Excel files.");
+  process.exit(1);
+}
+
+console.log(`✅ Monitoring ${devices.length} devices.`);
+
+let deviceStatus = {};
+let downtimeLogs = {};
+
+// Load downtime logs
+if (fs.existsSync(downtimeFile)) {
+  downtimeLogs = JSON.parse(fs.readFileSync(downtimeFile, "utf-8"));
+} else {
+  fs.writeFileSync(downtimeFile, JSON.stringify({}, null, 2));
+}
+
+// Function to log downtime
+function logDowntime(ip, status) {
+  const now = new Date().toISOString();
+
+  if (status === "Offline") {
+    if (!downtimeLogs[ip] || downtimeLogs[ip].endTime) {
+      downtimeLogs[ip] = { startTime: now, endTime: null };
+    }
+  } else {
+    if (downtimeLogs[ip] && !downtimeLogs[ip].endTime) {
+      downtimeLogs[ip].endTime = now;
+    }
+  }
+
+  fs.writeFileSync(downtimeFile, JSON.stringify(downtimeLogs, null, 2));
+}
+
+// Function to ping devices
+async function pingDevices() {
+  for (const ip of devices) {
+    try {
+      const result = await ping.promise.probe(ip);
+      const newStatus = result.alive ? "Online" : "Offline";
+
+      if (deviceStatus[ip] !== newStatus) {
+        console.log(`[${new Date().toISOString()}] ${ip} changed status: ${newStatus}`);
+        logDowntime(ip, newStatus);
+      }
+
+      deviceStatus[ip] = newStatus;
+    } catch (error) {
+      console.error(`Error pinging ${ip}:`, error);
+      logDowntime(ip, "Offline");
+      deviceStatus[ip] = "Offline";
+    }
+  }
+  console.log("✅ Updated device status:", JSON.stringify(deviceStatus, null, 2));
+}
+
+// Start pinging every 30 seconds
+setInterval(pingDevices, 30000);
+
+// API Endpoints
+app.get("/api/devices/status", (req, res) => res.json(deviceStatus));
+app.get("/api/devices/downtime", (req, res) => res.json(downtimeLogs));
+app.get("/api/ping/:ip", async (req, res) => {
+  const ip = req.params.ip;
+  try {
+    const result = await ping.promise.probe(ip);
+    res.json({ ip, status: result.alive ? "Online" : "Offline" });
+  } catch (error) {
+    res.json({ ip, status: "Offline" });
+  }
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  pingDevices();
+});
 
 
 
