@@ -1,21 +1,3 @@
-console.log(`[${new Date().toISOString()}] Pinging ${ip}: ${deviceStatus[ip]}`);
-
-
-
-
-
-if (fs.existsSync(downtimeFile)) {
-  downtimeLogs = JSON.parse(fs.readFileSync(downtimeFile, "utf-8"));
-} else {
-  fs.writeFileSync(downtimeFile, JSON.stringify({}, null, 2)); // Creates the file if missing
-}
-
-
-
-
-
-
-
 
 require("dotenv").config();
 const express = require("express");
@@ -43,12 +25,14 @@ app.use(bodyParser.json());
 app.use("/api/regions", regionRoutes);
 
 // File path for downtime logs
-const downtimeFile = path.join(__dirname, "./src/data/downtimeLogs.json");
+const downtimeFile = path.join(__dirname, "data" , "downtimeLogs.json");
 let downtimeLogs = {};
 
 // Load existing downtime data when the server starts
 if (fs.existsSync(downtimeFile)) {
   downtimeLogs = JSON.parse(fs.readFileSync(downtimeFile, "utf-8"));
+} else {
+  fs.writeFileSync(downtimeFile, JSON.stringify({}, null, 2)); // Creates the file if missing
 }
 
 // Devices to monitor
@@ -84,7 +68,8 @@ async function pingDevices() {
       
       // If status changes, log it
       if (deviceStatus[ip] !== newStatus) {
-        console.log(`[${new Date().toISOString()}] ${ip} changed status: ${newStatus}`);
+        // console.log(`[${new Date().toISOString()}] ${ip} changed status: ${newStatus}`);
+        console.log(`[${new Date().toISOString()}] Pinging ${ip}: ${deviceStatus[ip] || "Unknown"}`);
         logDowntime(ip, newStatus);
       }
 
@@ -95,7 +80,7 @@ async function pingDevices() {
       deviceStatus[ip] = "Offline";
     }
   }
-  console.log("Updated device status:", deviceStatus);
+  console.log("Updated device status:", JSON.stringify(deviceStatus,null,2));
 }
 
 // Ping devices every 30 seconds
