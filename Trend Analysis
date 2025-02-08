@@ -1,3 +1,141 @@
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const fs = require("fs");
+const path = require("path");
+const ping = require("ping");
+const regionRoutes = require("./routes/regionRoutes");
+
+const app = express();
+const PORT = process.env.PORT || 80;
+
+// Middleware
+app.use(
+  cors({
+    origin: "http://127.0.0.1:5501", // Match your frontend's origin
+    methods: "GET,POST,PUT,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+  })
+);
+app.use(bodyParser.json());
+
+// Routes
+app.use("/api/regions", regionRoutes);
+
+// File path for downtime logs
+const downtimeFile = path.join(__dirname, "data", "downtimeLogs.json");
+let downtimeLogs = {};
+
+// Load existing downtime data when the server starts
+if (fs.existsSync(downtimeFile)) {
+  try {
+    downtimeLogs = JSON.parse(fs.readFileSync(downtimeFile, "utf-8"));
+  } catch (error) {
+    console.error("Error reading downtime logs:", error);
+    downtimeLogs = {};
+  }
+} else {
+  fs.writeFileSync(downtimeFile, JSON.stringify({}, null, 2)); // Creates the file if missing
+}
+
+// Devices to monitor
+const devices = ["10.58.118.20", "10.58.118.21", "10.199.22.61", "10.130.36.56", "10.64.10.50"];
+let deviceStatus = {};
+
+// Initialize all devices as "Unknown" until first ping
+devices.forEach((ip) => (deviceStatus[ip] = "Unknown"));
+
+// Function to log downtime
+function logDowntime(ip, status) {
+  const now = new Date().toISOString();
+  
+  if (status === "Offline") {
+    // If the device just went offline, log the start time
+    if (!downtimeLogs[ip] || downtimeLogs[ip].endTime) {
+      downtimeLogs[ip] = { startTime: now, endTime: null };
+    }
+  } else {
+    // If the device is back online, log the end time
+    if (downtimeLogs[ip] && !downtimeLogs[ip].endTime) {
+      downtimeLogs[ip].endTime = now;
+    }
+  }
+
+  // Save the updated downtime log
+  fs.writeFileSync(downtimeFile, JSON.stringify(downtimeLogs, null, 2));
+}
+
+// Function to continuously ping devices and track downtime
+async function pingDevices() {
+  for (const ip of devices) {
+    try {
+      const result = await ping.promise.probe(ip);
+      const newStatus = result.alive ? "Online" : "Offline";
+      
+      // If status changes, log it
+      if (deviceStatus[ip] !== newStatus) {
+        console.log(`[${new Date().toISOString()}] ${ip} changed status: ${newStatus}`);
+        logDowntime(ip, newStatus);
+      }
+
+      deviceStatus[ip] = newStatus;
+    } catch (error) {
+      console.error(`Error pinging ${ip}:`, error);
+      logDowntime(ip, "Offline");
+      deviceStatus[ip] = "Offline";
+    }
+  }
+  console.log("Updated device status:", JSON.stringify(deviceStatus, null, 2));
+}
+
+// Ping devices every 30 seconds
+setInterval(pingDevices, 30000);
+
+// API to get real-time status of all devices
+app.get("/api/devices/status", (req, res) => {
+  res.json(deviceStatus);
+});
+
+// API to get downtime logs
+app.get("/api/devices/downtime", (req, res) => {
+  res.json(downtimeLogs);
+});
+
+// Ping a specific device dynamically
+app.get("/api/ping/:ip", async (req, res) => {
+  const ip = req.params.ip;
+  
+  try {
+    const result = await ping.promise.probe(ip);
+    res.json({ ip, status: result.alive ? "Online" : "Offline" });
+  } catch (error) {
+    console.error(`Ping error for ${ip}:`, error);
+    res.json({ ip, status: "Offline" });
+  }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something went wrong!");
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  pingDevices(); // Start pinging devices immediately
+});
+
+
+
+
+
+
+
+
+
+
 
 require("dotenv").config();
 const express = require("express");
