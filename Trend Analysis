@@ -1,3 +1,9 @@
+console.log(`[${new Date().toISOString()}] Pinging ${ip}: ${deviceStatus[ip]}`);
+
+
+
+
+
 if (fs.existsSync(downtimeFile)) {
   downtimeLogs = JSON.parse(fs.readFileSync(downtimeFile, "utf-8"));
 } else {
