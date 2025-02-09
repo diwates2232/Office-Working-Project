@@ -1,3 +1,47 @@
+function loadExcelData() {
+    const filePaths = [
+        path.join(__dirname, "data", "ArchiverData.xlsx"),
+        path.join(__dirname, "data", "CameraData.xlsx"),
+        path.join(__dirname, "data", "ControllerData.xlsx"),
+        path.join(__dirname, "data", "ServerData.xlsx")
+    ];
+
+    let devices = [];
+
+    filePaths.forEach((filePath) => {
+        try {
+            console.log(`Loading: ${filePath}`);
+            const workbook = xlsx.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rawData = xlsx.utils.sheet_to_json(sheet);
+
+            // Convert column names to lowercase for consistency
+            const formattedData = rawData.map((row) => ({
+                cameraname: row.cameraname || "Unknown",
+                ip_address: row.Ip_address || row.ip_address || "N/A", // Handle both cases
+                location: row.Location || "N/A",
+            }));
+
+            console.log(`✅ Loaded ${formattedData.length} devices from ${filePath}`);
+            devices = devices.concat(formattedData);
+        } catch (error) {
+            console.error(`❌ Error loading ${filePath}:`, error.message);
+        }
+    });
+
+    console.log("📌 Final Loaded Devices:", devices);
+    return devices;
+}
+
+
+
+
+
+
+
+
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
