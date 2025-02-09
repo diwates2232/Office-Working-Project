@@ -1,47 +1,3 @@
-function loadExcelData() {
-    const filePaths = [
-        path.join(__dirname, "data", "ArchiverData.xlsx"),
-        path.join(__dirname, "data", "CameraData.xlsx"),
-        path.join(__dirname, "data", "ControllerData.xlsx"),
-        path.join(__dirname, "data", "ServerData.xlsx")
-    ];
-
-    let devices = [];
-
-    filePaths.forEach((filePath) => {
-        try {
-            console.log(`Loading: ${filePath}`);
-            const workbook = xlsx.readFile(filePath);
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            const rawData = xlsx.utils.sheet_to_json(sheet);
-
-            // Convert column names to lowercase for consistency
-            const formattedData = rawData.map((row) => ({
-                cameraname: row.cameraname || "Unknown",
-                ip_address: row.Ip_address || row.ip_address || "N/A", // Handle both cases
-                location: row.Location || "N/A",
-            }));
-
-            console.log(`✅ Loaded ${formattedData.length} devices from ${filePath}`);
-            devices = devices.concat(formattedData);
-        } catch (error) {
-            console.error(`❌ Error loading ${filePath}:`, error.message);
-        }
-    });
-
-    console.log("📌 Final Loaded Devices:", devices);
-    return devices;
-}
-
-
-
-
-
-
-
-
-
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -59,29 +15,41 @@ app.use(bodyParser.json());
 
 // ✅ Load Excel Data
 function loadExcelData() {
-    const filePaths = [
-        path.join(__dirname, "data", "ArchiverData.xlsx"),
-        path.join(__dirname, "data", "CameraData.xlsx"),
-        path.join(__dirname, "data", "ControllerData.xlsx"),
-        path.join(__dirname, "data", "ServerData.xlsx")
-    ];
+  const filePaths = [
+      path.join(__dirname, "data", "ArchiverData.xlsx"),
+      path.join(__dirname, "data", "CameraData.xlsx"),
+      path.join(__dirname, "data", "ControllerData.xlsx"),
+      path.join(__dirname, "data", "ServerData.xlsx")
+  ];
 
-    let devices = [];
+  let devices = [];
 
-    filePaths.forEach((filePath) => {
-        try {
-            const workbook = xlsx.readFile(filePath);
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            const data = xlsx.utils.sheet_to_json(sheet);
-            devices = devices.concat(data);
-        } catch (error) {
-            console.error(`Error loading ${filePath}:`, error.message);
-        }
-    });
+  filePaths.forEach((filePath) => {
+      try {
+          console.log(`Loading: ${filePath}`);
+          const workbook = xlsx.readFile(filePath);
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rawData = xlsx.utils.sheet_to_json(sheet);
 
-    return devices;
+          // Convert column names to lowercase for consistency
+          const formattedData = rawData.map((row) => ({
+              cameraname: row.cameraname || "Unknown",
+              ip_address: row.Ip_address || row.ip_address || "N/A", // Handle both cases
+              location: row.Location || "N/A",
+          }));
+
+          console.log(`✅ Loaded ${formattedData.length} devices from ${filePath}`);
+          devices = devices.concat(formattedData);
+      } catch (error) {
+          console.error(`❌ Error loading ${filePath}:`, error.message);
+      }
+  });
+
+  console.log("📌 Final Loaded Devices:", devices);
+  return devices;
 }
+
 
 // ✅ Load all devices on startup
 let allDevices = loadExcelData();
@@ -92,7 +60,7 @@ async function pingDevices() {
     console.log("🔄 Pinging all devices...");
     
     for (const device of allDevices) {
-        const ip = device.ip_address;
+        const ip = device.Ip_address;
         if (!ip) continue; // Skip if IP is missing
 
         try {
@@ -117,7 +85,7 @@ app.get("/api/devices/status", (req, res) => {
 
 // ✅ API Route: Ping a Specific Device
 app.get("/api/ping/:ip", async (req, res) => {
-    const ip = req.params.ip;
+    const ip = req.params.Ip_address;
     if (!ip) return res.status(400).json({ error: "IP address is required" });
 
     try {
@@ -146,7 +114,6 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     pingDevices(); // Start pinging devices immediately
 });
-
 
 
 
