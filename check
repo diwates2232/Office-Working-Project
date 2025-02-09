@@ -1,135 +1,13 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const xlsx = require("xlsx"); // Excel handling
-const ping = require("ping");
-const path = require("path");
 
-const app = express();
-const PORT = process.env.PORT || 80;
 
-// Middleware
-app.use(cors({ origin: "http://127.0.0.1:5501", methods: "GET,POST,PUT,DELETE" }));
-app.use(bodyParser.json());
 
-// ✅ Load Excel Data
-function loadExcelData() {
-  const filePaths = [
-    path.join(__dirname, "data", "ArchiverData.xlsx"),
-    path.join(__dirname, "data", "CameraData.xlsx"),
-    path.join(__dirname, "data", "ControllerData.xlsx"),
-    path.join(__dirname, "data", "ServerData.xlsx")
-  ];
 
-  let devices = [];
 
-  filePaths.forEach((filePath) => {
-    try {
-      console.log(`Loading: ${filePath}`);
-      const workbook = xlsx.readFile(filePath);
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rawData = xlsx.utils.sheet_to_json(sheet);
 
-      // Format device data
-      const formattedData = rawData.map((row) => {
-        let device = {
-          ip_address: row.Ip_address || row.ip_address || "N/A", // Handle both cases
-          location: row.Location || "N/A",
-        };
 
-        // Add name based on file type
-        if (filePath.includes("ArchiverData")) {
-          device.archivername = row.archivername || "Unknown";
-        } else if (filePath.includes("CameraData")) {
-          device.cameraname = row.cameraname || "Unknown";
-        } else if (filePath.includes("ControllerData")) {
-          device.controllername = row.controllername || "Unknown";
-        } else if (filePath.includes("ServerData")) {
-          device.servername = row.servername || "Unknown";
-        }
 
-        return device;
-      });
 
-      console.log(`✅ Loaded ${formattedData.length} devices from ${filePath}`);
-      devices = devices.concat(formattedData);
-    } catch (error) {
-      console.error(`❌ Error loading ${filePath}:`, error.message);
-    }
-  });
 
-  console.log("📌 Final Loaded Devices:", devices);
-  return devices;
-}
-
-// ✅ Load all devices on startup
-let allDevices = loadExcelData();
-let deviceStatus = {};
-
-// ✅ Function to Ping Devices and Update Status
-async function pingDevices() {
-  console.log("🔄 Pinging all devices...");
-
-  for (const device of allDevices) {
-    const ip = device.ip_address;  // Make sure it's referring to ip_address
-    if (!ip || ip === "N/A") continue; // Skip if IP is missing or invalid
-
-    console.log(`Pinging device: ${device.archivername || device.cameraname || device.controllername || device.servername}, IP: ${ip}`);  // Debug log
-
-    try {
-      const result = await ping.promise.probe(ip);
-      console.log(`Ping result for ${ip}: ${result.alive ? "Online" : "Offline"}`); // Debug log
-      deviceStatus[ip] = result.alive ? "Online" : "Offline";
-    } catch (error) {
-      console.error(`Ping error for ${ip}:`, error.message);
-      deviceStatus[ip] = "Offline";  // In case of an error, mark the device as offline
-    }
-  }
-
-  console.log("✅ Updated Device Status:", deviceStatus); // Final debug log
-}
-
-// ✅ Ping devices every 30 seconds
-setInterval(pingDevices, 30000);
-
-// ✅ API Route: Get live status of all devices
-app.get("/api/devices/status", (req, res) => {
-  res.json(deviceStatus);
-});
-
-// ✅ API Route: Ping a Specific Device
-app.get("/api/ping/:ip", async (req, res) => {
-  const ip = req.params.ip;
-  if (!ip) return res.status(400).json({ error: "IP address is required" });
-
-  try {
-    const result = await ping.promise.probe(ip);
-    res.json({ ip, status: result.alive ? "Online" : "Offline" });
-  } catch (error) {
-    console.error(`Ping error for ${ip}:`, error.message);
-    res.json({ ip, status: "Offline" });
-  }
-});
-
-// ✅ API Route: Reload Excel Data (Manual Refresh)
-app.get("/api/reload", (req, res) => {
-  allDevices = loadExcelData();
-  res.json({ message: "Excel data reloaded successfully!", devices: allDevices });
-});
-
-// ✅ Error Handling Middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something went wrong!");
-});
-
-// ✅ Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  pingDevices(); // Start pinging devices immediately
-});
 
 
 
