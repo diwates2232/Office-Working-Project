@@ -1,1 +1,237 @@
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const ping = require("ping");
+const path = require("path");
+const xlsx = require("xlsx");
 
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const PORT = 80;
+let allDevices = []; // Array to store all devices
+let deviceStatus = {}; // Object to store the device status
+
+// Load data from Excel files (Archiver, Camera, Controller, Server)
+function loadExcelData() {
+  const filePaths = [
+    path.join(__dirname, "data", "ArchiverData.xlsx"),
+    path.join(__dirname, "data", "CameraData.xlsx"),
+    path.join(__dirname, "data", "ControllerData.xlsx"),
+    path.join(__dirname, "data", "ServerData.xlsx")
+  ];
+
+  let devices = [];
+
+  filePaths.forEach((filePath) => {
+    try {
+      console.log(`Loading: ${filePath}`);
+      const workbook = xlsx.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rawData = xlsx.utils.sheet_to_json(sheet);
+
+      const formattedData = rawData.map((row) => ({
+        cameraname: row.cameraname || "Unknown",
+        ip_address: row.Ip_address || row.ip_address || "N/A", // Handle both cases
+        location: row.Location || "N/A",
+      }));
+
+      console.log(`✅ Loaded ${formattedData.length} devices from ${filePath}`);
+      devices = devices.concat(formattedData);
+    } catch (error) {
+      console.error(`❌ Error loading ${filePath}:`, error.message);
+    }
+  });
+
+  console.log("📌 Final Loaded Devices:", devices);
+  return devices;
+}
+
+// Ping devices to check if they are online
+async function pingDevices() {
+  console.log("🔄 Pinging all devices...");
+
+  let updatedStatus = {}; // Temporary object to store updated statuses
+
+  for (const device of allDevices) {
+    const ip = device.ip_address;  // Corrected the variable name here
+    if (!ip) continue; // Skip if IP is missing
+
+    try {
+      const result = await ping.promise.probe(ip);
+      updatedStatus[ip] = result.alive ? "Online" : "Offline";
+      console.log(`Device ${ip} is ${updatedStatus[ip]}`); // Log device ping status
+    } catch (error) {
+      console.error(`Ping error for ${ip}:`, error.message);
+      updatedStatus[ip] = "Offline";
+    }
+  }
+
+  console.log("✅ Updated Device Status:", updatedStatus);
+
+  // Emit device status update via WebSocket
+  io.emit("deviceStatusUpdate", updatedStatus);
+}
+
+// Set a schedule to ping devices every 30 seconds, only once
+let pingInterval = setInterval(pingDevices, 30000);
+
+// Serve static files (HTML, JS, CSS) for the frontend
+app.use(express.static(path.join(__dirname, "public")));
+
+// WebSocket connection and event handling
+io.on("connection", (socket) => {
+  console.log("A user connected");
+
+  // Send the initial device status to the new client
+  socket.emit("deviceStatusUpdate", deviceStatus);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+  });
+});
+
+// API route to manually trigger ping (for testing purposes)
+app.get("/api/ping/all", (req, res) => {
+  console.log("Manual ping triggered");
+  pingDevices(); // Manually trigger ping to update statuses
+  res.send("Pinging devices...");
+});
+
+// Start the server
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+// Load initial data from Excel files
+allDevices = loadExcelData();
+
+
+
+
+const socket = io("http://localhost:80");
+
+document.addEventListener("DOMContentLoaded", () => {
+    fetchSummary("global");
+    fetchDetails("global");
+
+    const regionButtons = document.querySelectorAll(".region-button");
+    regionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const region = button.getAttribute("data-region");
+            document.getElementById("region-title").textContent = `${region.toUpperCase()} Summary`;
+            fetchSummary(region);
+            fetchDetails(region);
+        });
+    });
+
+    document.getElementById("close-modal").addEventListener("click", () => {
+        document.getElementById("modal").style.display = "none";
+    });
+
+    // WebSocket listener for live updates
+    socket.on("deviceStatusUpdate", (updatedStatus) => {
+        console.log("Live update received:", updatedStatus);
+        updateLiveStatus(updatedStatus);
+    });
+});
+
+function fetchSummary(regionName) {
+    const summaryUrl = `/api/regions/summary/${regionName}`;
+
+    fetch(summaryUrl)
+        .then(response => response.json())
+        .then(summary => {
+            console.log("Summary Data:", summary);
+            updateSummary(summary);
+        })
+        .catch(error => {
+            console.error("Error fetching summary:", error);
+        });
+}
+
+function fetchDetails(regionName) {
+    const detailsUrl = `/api/regions/details/${regionName}`;
+
+    fetch(detailsUrl)
+        .then(response => response.json())
+        .then(details => {
+            console.log("Details Data:", details);
+            updateDetails(details);
+        })
+        .catch(error => {
+            console.error("Error fetching details:", error);
+        });
+}
+
+function updateSummary(data) {
+    document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
+    document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
+    document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
+}
+
+function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    detailsContainer.innerHTML = "";
+
+    const allDevices = [];
+
+    for (const [key, devices] of Object.entries(data.details)) {
+        if (!Array.isArray(devices) || devices.length === 0) continue;
+
+        devices.forEach((device) => {
+            const deviceIP = device.ip_address || "N/A";
+            const currentStatus = device.status.toLowerCase();
+
+            const card = document.createElement("div");
+            card.className = "device-card";
+            card.dataset.ip = deviceIP;
+            card.dataset.status = currentStatus;
+
+            const statusDot = document.createElement("span");
+            statusDot.className = "status-dot";
+            statusDot.style.backgroundColor = currentStatus === "online" ? "green" : "red";
+
+            card.innerHTML = `
+                <h3>${device.name || "Unknown Device"}</h3>
+                <p>IP: ${deviceIP}</p>
+                <p>Status: <span class="device-status">${currentStatus}</span> ${statusDot.outerHTML}</p>
+                <button class="details-button" onclick="showModal('${device.name}', '${deviceIP}', '${currentStatus}')">Details</button>
+            `;
+
+            allDevices.push(card);
+        });
+    }
+
+    allDevices.forEach((deviceCard) => {
+        detailsContainer.appendChild(deviceCard);
+    });
+}
+
+// **Update device status live using WebSockets**
+function updateLiveStatus(updatedStatus) {
+    document.querySelectorAll(".device-card").forEach((card) => {
+        const ip = card.dataset.ip;
+        if (updatedStatus[ip]) {
+            const newStatus = updatedStatus[ip].toLowerCase();
+            const statusDot = card.querySelector(".status-dot");
+            const statusText = card.querySelector(".device-status");
+
+            statusText.textContent = newStatus;
+            card.dataset.status = newStatus;
+            statusDot.style.backgroundColor = newStatus === "online" ? "green" : "red";
+        }
+    });
+}
+
+function showModal(name, ip, status) {
+    document.getElementById("modal-title").textContent = `Details for ${name}`;
+    document.getElementById("modal-body").innerHTML = `
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>IP:</strong> ${ip}</li>
+        <li><strong>Status:</strong> ${status}</li>
+    `;
+    document.getElementById("modal").style.display = "block";
+}
