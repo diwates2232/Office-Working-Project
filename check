@@ -1,4 +1,195 @@
+const baseUrl = "http://localhost:80/api/regions";
 
+document.addEventListener("DOMContentLoaded", () => {
+    let regionName = "global"; // Default region
+    startAutoRefresh(regionName);
+
+    fetchSummary(regionName);
+    fetchDetails(regionName);
+
+    document.querySelectorAll(".region-button").forEach((button) => {
+        button.addEventListener("click", () => {
+            const region = button.getAttribute("data-region");
+            document.getElementById("region-title").textContent = `${region.toUpperCase()} Summary`;
+            fetchSummary(region);
+            fetchDetails(region);
+            startAutoRefresh(region);
+        });
+    });
+
+    document.getElementById("close-modal").addEventListener("click", () => {
+        document.getElementById("modal").style.display = "none";
+    });
+});
+
+let refreshInterval = 300000; // 5 minutes (300,000 ms)
+
+async function fetchData(regionName) {
+    try {
+        const [summaryResponse, detailsResponse] = await Promise.all([
+            fetch(`${baseUrl}/summary/${regionName}`),
+            fetch(`${baseUrl}/details/${regionName}`)
+        ]);
+
+        const summary = await summaryResponse.json();
+        const details = await detailsResponse.json();
+
+        updateSummary(summary);
+        updateDetails(details);
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    }
+}
+
+function startAutoRefresh(regionName) {
+    fetchData(regionName);
+
+    setInterval(() => {
+        fetchData(regionName);
+    }, refreshInterval);
+}
+
+async function fetchSummary(regionName) {
+    try {
+        const response = await fetch(`${baseUrl}/summary/${regionName}`);
+        const summary = await response.json();
+        updateSummary(summary);
+    } catch (error) {
+        console.error("Error fetching summary:", error);
+    }
+}
+
+async function fetchDetails(regionName) {
+    try {
+        const response = await fetch(`${baseUrl}/details/${regionName}`);
+        const details = await response.json();
+        
+        updateDetails(details); // Use async rendering
+        setInterval(() => pingAllDevices(details), 10000); // Ping devices every 10 seconds
+    } catch (error) {
+        console.error("Error fetching details:", error);
+    }
+}
+
+async function updateDetails(data) {
+    const detailsContainer = document.getElementById("device-details");
+    detailsContainer.innerHTML = ""; // Clear previous data
+
+    try {
+        const liveStatusResponse = await fetch("http://localhost:80/api/devices/status");
+        const realTimeStatus = await liveStatusResponse.json();
+
+        // Load data in **small chunks** to avoid UI lag
+        Object.entries(data.details).forEach(([key, devices]) => {
+            if (!Array.isArray(devices) || devices.length === 0) return;
+
+            setTimeout(() => { // Async rendering for better performance
+                devices.forEach((device) => {
+                    const deviceIP = device.ip_address || "N/A";
+                    const currentStatus = realTimeStatus[deviceIP] || device.status;
+
+                    const card = document.createElement("div");
+                    card.className = "device-card";
+                    card.dataset.type = key.toLowerCase();
+                    card.dataset.status = currentStatus.toLowerCase();
+
+                    const statusDot = document.createElement("span");
+                    statusDot.className = "status-dot";
+                    statusDot.style.backgroundColor = currentStatus === "Online" ? "green" : "red";
+
+                    card.innerHTML = `
+                        <h3>${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}</h3>
+                        <p>DEVICE TYPE: ${key.toUpperCase()}</p>
+                        <p>IP: ${deviceIP}</p>
+                        <p>LOCATION: ${device.location || "N/A"}</p>
+                        <p>Status: ${currentStatus} ${statusDot.outerHTML}</p>
+                        <button class="details-button" onclick="showModal('${device.cameraname || device.controllername || device.archivername || device.servername || "Unknown Device"}', '${deviceIP}', '${device.location || "N/A"}', '${currentStatus}')">Details</button>
+                    `;
+
+                    detailsContainer.appendChild(card);
+                });
+            }, 0); // Async rendering (non-blocking UI)
+        });
+    } catch (error) {
+        console.error("Error fetching real-time device status:", error);
+        detailsContainer.innerHTML = "<p>Failed to load device details.</p>";
+    }
+}
+
+async function pingAllDevices(details) {
+    const devicesToPing = [];
+
+    Object.values(details.details).forEach((devices) => {
+        if (!Array.isArray(devices) || devices.length === 0) return;
+
+        devices.forEach((device) => {
+            if (device.status === "Offline") {
+                devicesToPing.push(device.ip_address);
+            }
+        });
+    });
+
+    if (devicesToPing.length > 0) {
+        try {
+            const response = await fetch(`${baseUrl}/ping/batch`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ips: devicesToPing })
+            });
+
+            const statusData = await response.json();
+            
+            statusData.forEach(({ ip, status }) => {
+                const card = document.querySelector(`[data-ip="${ip}"]`);
+                if (!card) return;
+
+                const statusDot = card.querySelector(".status-dot");
+                const statusText = card.querySelector(".device-status");
+
+                if (status.toLowerCase() === "online") {
+                    statusDot.style.backgroundColor = "green";
+                    statusText.textContent = "Online";
+                    card.dataset.status = "online";
+                } else {
+                    statusDot.style.backgroundColor = "red";
+                    statusText.textContent = "Offline";
+                    card.dataset.status = "offline";
+                }
+            });
+        } catch (error) {
+            console.error("Ping batch request failed:", error);
+        }
+    }
+}
+
+function updateSummary(data) {
+    document.getElementById("total-devices").textContent = data.summary?.totalDevices || "N/A";
+    document.getElementById("online-devices").textContent = data.summary?.totalOnlineDevices || "N/A";
+    document.getElementById("offline-devices").textContent = data.summary?.totalOfflineDevices || "N/A";
+
+    ["camera", "archiver", "controller", "server"].forEach(type => {
+        document.getElementById(`${type}-total`).textContent = data.summary?.[`${type}s`]?.total || "N/A";
+        document.getElementById(`${type}-online`).textContent = data.summary?.[`${type}s`]?.online || "N/A";
+        document.getElementById(`${type}-offline`).textContent = data.summary?.[`${type}s`]?.offline || "N/A";
+    });
+}
+
+function showModal(name, ip, location, status) {
+    document.getElementById("modal-title").textContent = `Details for ${name}`;
+    document.getElementById("modal-body").innerHTML = `
+        <li><strong>Name:</strong> ${name}</li>
+        <li><strong>IP:</strong> ${ip}</li>
+        <li><strong>Location:</strong> ${location}</li>
+        <li><strong>Status:</strong> ${status}</li>
+    `;
+    document.getElementById("modal").style.display = "block";
+
+    document.getElementById("modal").addEventListener("click", (event) => {
+        if (event.target === document.getElementById("modal")) {
+            document.getElementById("modal").style.display = "none";
+        }
+    });
+}
 
 
 
