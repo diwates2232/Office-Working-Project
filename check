@@ -1,3 +1,262 @@
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const regionRoutes = require("./routes/regionRoutes");
+const ping = require("ping");
+const pLimit = require("p-limit");
+
+const app = express();
+const PORT = process.env.PORT || 80;
+
+const { fetchAllIpAddress } = require("./services/excelService");
+
+// Middleware
+app.use(
+  cors({
+    origin: "http://127.0.0.1:5501",
+    methods: "GET,POST,PUT,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+  })
+);
+app.use(bodyParser.json());
+
+// Routes
+app.use("/api/regions", regionRoutes);
+
+// Ping a specific device dynamically
+app.get("/api/ping/:ip", async (req, res) => {
+  const ip = req.params.ip;
+  try {
+    const result = await ping.promise.probe(ip);
+    res.json({ ip, status: result.alive ? "Online" : "Offline" });
+  } catch (error) {
+    console.error(`Ping error for ${ip}:`, error);
+    res.status(500).json({ error: "Error pinging device", details: error.message });
+  }
+});
+
+// Store device status
+let deviceStatus = {};
+
+// Function to ping all devices concurrently
+const pingDevices = async () => {
+  try {
+    const devices = fetchAllIpAddress(); // Fetch dynamically in case the list updates
+    const limit = pLimit(10); // Limit concurrent pings to 10 at a time
+
+    const pingPromises = devices.map((ip) =>
+      limit(async () => {
+        try {
+          const result = await ping.promise.probe(ip);
+          deviceStatus[ip] = result.alive ? "Online" : "Offline";
+        } catch (error) {
+          console.error(`Error pinging ${ip}:`, error);
+          deviceStatus[ip] = "Offline";
+        }
+      })
+    );
+
+    await Promise.all(pingPromises);
+    console.log("Updated device status:", deviceStatus);
+  } catch (error) {
+    console.error("Error in pingDevices function:", error);
+  }
+};
+
+// Ping devices every 30 seconds
+setInterval(pingDevices, 30000);
+
+// Get real-time status of all devices
+app.get("/api/devices/status", (req, res) => {
+  res.json(deviceStatus);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Server Error:", err.stack);
+  res.status(500).json({ error: "Something went wrong!", details: err.message });
+});
+
+// Start Server
+app.listen(PORT, async () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  await pingDevices(); // Initial ping on startup
+});
+
+
+
+
+
+
+
+
+
+const xlsx = require("xlsx");
+const path = require("path");
+const ping = require("ping");
+const pLimit = require("p-limit");
+
+// Paths for Excel files
+const archiverPath = path.join(__dirname, "../data/ArchiverData.xlsx");
+const controllerPath = path.join(__dirname, "../data/ControllerData.xlsx");
+const cameraPath = path.join(__dirname, "../data/CameraData.xlsx");
+const serverPath = path.join(__dirname, "../data/ServerData.xlsx");
+
+// Cache to store preloaded data (with TTL)
+let allData = {};
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // Cache ping results for 5 minutes
+
+// Function to normalize column headers
+const normalizeHeaders = (data) => {
+    return data.map((row) => {
+        const normalizedRow = {};
+        for (const key in row) {
+            const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+            normalizedRow[normalizedKey] = row[key];
+        }
+        return normalizedRow;
+    });
+};
+
+// Function to load Excel data dynamically
+const loadExcelData = () => {
+    const archiverWorkbook = xlsx.readFile(archiverPath);
+    const controllerWorkbook = xlsx.readFile(controllerPath);
+    const cameraWorkbook = xlsx.readFile(cameraPath);
+    const serverWorkbook = xlsx.readFile(serverPath);
+
+    allData = {
+        archivers: normalizeHeaders(xlsx.utils.sheet_to_json(archiverWorkbook.Sheets[archiverWorkbook.SheetNames[0]])),
+        controllers: normalizeHeaders(xlsx.utils.sheet_to_json(controllerWorkbook.Sheets[controllerWorkbook.SheetNames[0]])),
+        cameras: normalizeHeaders(xlsx.utils.sheet_to_json(cameraWorkbook.Sheets[cameraWorkbook.SheetNames[0]])),
+        servers: normalizeHeaders(xlsx.utils.sheet_to_json(serverWorkbook.Sheets[serverWorkbook.SheetNames[0]])),
+    };
+};
+
+// Function to get all device IPs
+const fetchAllIpAddress = () => {
+    if (Object.keys(allData).length === 0) loadExcelData();
+
+    const devices = [
+        ...allData.cameras,
+        ...allData.archivers,
+        ...allData.controllers,
+        ...allData.servers,
+    ];
+
+    // Extract valid IP addresses
+    return devices
+        .map((device) => device.ip_address)
+        .filter((ip) => ip && typeof ip === "string");
+};
+
+// Function to fetch global data
+const fetchGlobalData = async () => {
+    if (Object.keys(allData).length === 0) loadExcelData();
+
+    const devices = {
+        cameras: allData.cameras,
+        archivers: allData.archivers,
+        controllers: allData.controllers,
+        servers: allData.servers,
+    };
+
+    // Ping devices before returning data
+    await pingDevices(devices);
+
+    const summary = calculateSummary(devices);
+    return { summary, details: devices };
+};
+
+// Function to fetch region-specific data
+const fetchRegionData = async (regionName) => {
+    if (Object.keys(allData).length === 0) loadExcelData();
+
+    const devices = {
+        cameras: allData.cameras.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+        archivers: allData.archivers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+        controllers: allData.controllers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+        servers: allData.servers.filter(row => row.location?.toLowerCase() === regionName.toLowerCase()),
+    };
+
+    // Ping devices before returning data
+    await pingDevices(devices);
+
+    const summary = calculateSummary(devices);
+    return { summary, details: devices };
+};
+
+// Function to calculate the summary
+const calculateSummary = (devices) => {
+    const summary = {};
+
+    for (const [key, deviceList] of Object.entries(devices)) {
+        const total = deviceList.length;
+        const online = deviceList.filter(device => device.status === "Online").length;
+        const offline = total - online;
+
+        summary[key] = { total, online, offline };
+    }
+
+    return {
+        totalDevices: Object.values(summary).reduce((sum, { total }) => sum + total, 0),
+        totalOnlineDevices: Object.values(summary).reduce((sum, { online }) => sum + online, 0),
+        totalOfflineDevices: Object.values(summary).reduce((sum, { offline }) => sum + offline, 0),
+        ...summary,
+    };
+};
+
+// Function to ping all devices concurrently
+const pingDevices = async (devices) => {
+    const limit = pLimit(10); // Limit concurrent pings to 10 at a time
+    const allDevices = [...devices.cameras, ...devices.archivers, ...devices.controllers, ...devices.servers];
+
+    const pingPromises = allDevices.map((device) =>
+        limit(async () => {
+            const ipAddress = device.ip_address;
+            if (!ipAddress) {
+                device.status = "IP Address Missing";
+                return;
+            }
+
+            const cachedStatus = cache.get(ipAddress);
+            if (cachedStatus && Date.now() - cachedStatus.timestamp < CACHE_TTL) {
+                device.status = cachedStatus.status;
+            } else {
+                const status = await pingDevice(ipAddress);
+                device.status = status;
+                cache.set(ipAddress, { status, timestamp: Date.now() });
+            }
+        })
+    );
+
+    await Promise.all(pingPromises);
+};
+
+// Function to ping a single device
+const pingDevice = (ip) => {
+    return new Promise((resolve) => {
+        ping.sys.probe(ip, (isAlive) => {
+            resolve(isAlive ? "Online" : "Offline");
+        });
+    });
+};
+
+// Initial data load
+loadExcelData();
+
+module.exports = { fetchGlobalData, fetchRegionData, fetchAllIpAddress };
+
+
+
+
+
+
+
+
+
 app.js
 
 require("dotenv").config();
