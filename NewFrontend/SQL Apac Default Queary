@@ -1,0 +1,61 @@
+-- Step 1: Select and join the tables, adjusting Date & Time and adding PersonnelType
+ 
+SELECT 
+   t1.[ObjectName1],
+   t1.[ObjectName2],
+  CASE
+       WHEN t2.[Int1] = 0 THEN t2.[Text12]
+       ELSE CAST(t2.[Int1] AS NVARCHAR)
+   END AS EmployeeID,
+   t2.[PersonnelTypeID],
+   t3.[Name], -- Adding the PersonnelType from the third table
+t2.text5,
+   DATEADD(MINUTE, -1 * t1.[MessageLocaleOffset], t1.[MessageUTC]) AS LocaleMessageTime
+INTO 
+   #CombinedEmployeeData  -- Temporary table
+FROM 
+  [ACVSUJournal_00010019].[dbo].[ACVSUJournalLog] AS t1  -- Replace with your actual table name
+INNER JOIN 
+   [ACVSCore].[Access].[Personnel] AS t2  -- Replace with the actual table name
+ON 
+   t1.[ObjectName1] = t2.[Name]
+INNER JOIN 
+   [ACVSCore].[Access].[PersonnelType] AS t3  -- Replace with the actual table name containing PersonnelType
+ON 
+   t2.[PersonnelTypeId] = t3.[ObjectID];
+ 
+-- Step 2: Calculate daily time duration based on min and max swipe times, and categorize time differences
+SELECT 
+   [ObjectName1],
+   [Name],
+EmployeeID,
+text5,
+   CONVERT(DATE, LocaleMessageTime) AS Date,  -- Extract date for daily grouping
+   MIN(LocaleMessageTime) AS FirstSwipeTime,  -- First swipe (min time of the day)
+   MAX(LocaleMessageTime) AS LastSwipeTime,   -- Last swipe (max time of the day)
+   DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) AS TimeDifferenceMinutes,  -- Time difference in minutes
+ 
+   -- Categorize the time difference
+   CASE 
+       WHEN DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) < 5 THEN '0-5 mins'
+       WHEN DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) >= 5 AND DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) < 30 THEN '5-30 mins'
+       WHEN DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) >= 30 AND DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) < 60 THEN '30-60 mins'
+       WHEN DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) >= 60 AND DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) < 180 THEN '1-3 hrs'
+       WHEN DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) >= 180 AND DATEDIFF(MINUTE, MIN(LocaleMessageTime), MAX(LocaleMessageTime)) < 360 THEN '3-6 hrs'
+       ELSE '6+ hrs'
+   END AS TimeDiffCategory        
+ 
+FROM 
+   #CombinedEmployeeData  -- Use the temporary table with combined data
+WHERE 
+   CONVERT (DATE, LocaleMessageTime) >= '2024-09-1' -- Filter by date if needed
+GROUP BY 
+   [ObjectName1],
+   EmployeeID, 
+   [Name],
+text5,
+   CONVERT(DATE, LocaleMessageTime)  -- Group by day to calculate min/max times per day
+ORDER BY 
+   Date DESC; -- Order by date for recent records
+ 
+has context menu
