@@ -1,3 +1,149 @@
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const regionRoutes = require("./routes/regionRoutes");
+const ping = require("ping");
+const net = require("net");
+const { fetchAllIpAddress } = require("./services/excelService");
+
+const app = express();
+const PORT = process.env.PORT || 80;
+
+// Middleware
+app.use(
+  cors({
+    origin: "http://127.0.0.1:5501", // Match your frontend's origin
+    methods: "GET,POST,PUT,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+  })
+);
+app.use(bodyParser.json());
+
+// Routes
+app.use("/api/regions", regionRoutes);
+
+// In-memory cache to track device status and stability
+let deviceStatus = new Map();
+
+// Function to check TCP port (for more reliable device status)
+const checkTcpPort = (host, port = 80, timeout = 3000) => {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeout);
+
+    socket.connect(port, host, () => {
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.on("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+};
+
+// Function to ping device multiple times to ensure accuracy
+const pingDeviceReliably = async (ip, retries = 3, delay = 1000) => {
+  let successCount = 0;
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await ping.promise.probe(ip);
+      if (result.alive) successCount++;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    } catch (error) {
+      console.error(`Ping error for ${ip}:`, error);
+    }
+  }
+
+  return successCount === retries;
+};
+
+// Function to check device status
+const checkDeviceStatus = async (ip) => {
+  const isPingAlive = await pingDeviceReliably(ip);
+
+  // If ping is successful, check a relevant TCP port (e.g., RTSP for cameras)
+  let isTcpAlive = false;
+  if (isPingAlive) {
+    isTcpAlive = await checkTcpPort(ip, 554); // Adjust port based on device type
+  }
+
+  return isPingAlive && isTcpAlive;
+};
+
+// Main function to continuously monitor devices
+const pingDevices = async () => {
+  const devices = fetchAllIpAddress();
+  const newStatus = new Map();
+
+  for (const ip of devices) {
+    const isAlive = await checkDeviceStatus(ip);
+    const currentStatus = isAlive ? "Online" : "Offline";
+
+    // Check the previous status for stability
+    const previousStatus = deviceStatus.get(ip) || "Unknown";
+
+    if (previousStatus === currentStatus || previousStatus === "Unknown") {
+      newStatus.set(ip, currentStatus);
+    } else {
+      // If status changes, re-validate to avoid false positives
+      const recheckAlive = await checkDeviceStatus(ip);
+      newStatus.set(ip, recheckAlive ? "Online" : "Offline");
+    }
+  }
+
+  deviceStatus = newStatus;
+  console.log("Updated device status:", Object.fromEntries(deviceStatus));
+};
+
+// Endpoint to ping a specific device dynamically
+app.get("/api/ping/:ip", async (req, res) => {
+  const ip = req.params.ip;
+
+  try {
+    const isAlive = await checkDeviceStatus(ip);
+    res.json({ ip, status: isAlive ? "Online" : "Offline" });
+  } catch (error) {
+    console.error(`Ping error for ${ip}:`, error);
+    res.json({ ip, status: "Offline" });
+  }
+});
+
+// Endpoint to get the real-time status of all devices
+app.get("/api/devices/status", (req, res) => {
+  const statusObj = Object.fromEntries(deviceStatus);
+  res.json(statusObj);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something went wrong!");
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  pingDevices(); // Start pinging devices immediately
+  setInterval(pingDevices, 120000); // Ping devices every 2 minutes
+});
+
+
+
+
+
+
+
+
+
 const baseUrl = "http://localhost:80/api/regions";
 
 document.addEventListener("DOMContentLoaded", () => {
