@@ -1,123 +1,20 @@
-Latest Updated
-
-
-
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const regionRoutes = require("./routes/regionRoutes");
-const ping = require("ping"); // Import the ping module
-
-const app = express();
-const PORT = process.env.PORT || 80;
-
+const ping = require("ping");
+const net = require("net");
+const { execSync } = require("child_process");
 const { fetchAllIpAddress } = require("./services/excelService");
 
-// Middleware
-app.use(
-  cors({
-    origin: "http://127.0.0.1:5501", // Match your frontend's origin
-    methods: "GET,POST,PUT,DELETE",
-    allowedHeaders: "Content-Type,Authorization",
-  })
-);
-app.use(bodyParser.json());
-
-// Routes
-app.use("/api/regions", regionRoutes);
-
-// Ping a specific device dynamically
-app.get("/api/ping/:ip", async (req, res) => {
-  const ip = req.params.ip;
-  
-  try {
-    const result = await ping.promise.probe(ip);
-    res.json({ ip, status: result.alive ? "Online" : "Offline" });
-  } catch (error) {
-    console.error(`Ping error for ${ip}:`, error);
-    res.json({ ip, status: "Offline" });
-  }
-});
-
-// Function to continuously ping all devices
-const devices = fetchAllIpAddress();
-let deviceStatus = {};
-
-async function pingDevices() {
-  for (const ip of devices) {
-    try {
-      const result = await ping.promise.probe(ip);
-      deviceStatus[ip] = result.alive ? "Online" : "Offline";
-    } catch (error) {
-      console.error(`Error pinging ${ip}:`, error);
-      deviceStatus[ip] = "Offline";
-    }
-  }
-  console.log("Updated device status:", deviceStatus);
-}
-
-// Ping devices every 30 seconds
-setInterval(pingDevices, 120000);
-
-// Get real-time status of all devices
-app.get("/api/devices/status", (req, res) => {
-  res.json(deviceStatus);
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something went wrong!");
-});
-
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  pingDevices(); // Start pinging devices immediately
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const regionRoutes = require("./routes/regionRoutes");
-const ping = require("ping"); // Import the ping module
-
 const app = express();
 const PORT = process.env.PORT || 80;
 
 // Middleware
 app.use(
   cors({
-    origin: "http://127.0.0.1:5501", // Match your frontend's origin
+    origin: "http://127.0.0.1:5500",
     methods: "GET,POST,PUT,DELETE",
     allowedHeaders: "Content-Type,Authorization",
   })
@@ -127,52 +24,128 @@ app.use(bodyParser.json());
 // Routes
 app.use("/api/regions", regionRoutes);
 
-// Ping a specific device dynamically
+// Device status map: { ip: { status, failCount } }
+let deviceStatus = new Map();
+
+// Function to flush ARP cache (helps avoid false positives)
+const flushArpCache = () => {
+  try {
+    const platform = process.platform;
+    if (platform === "win32") {
+      execSync("arp -d *");
+    } else if (platform === "linux" || platform === "darwin") {
+      execSync("sudo ip -s -s neigh flush all");
+    }
+    console.log("ARP cache flushed.");
+  } catch (error) {
+    console.error("Failed to flush ARP cache:", error);
+  }
+};
+
+// Function to check TCP port
+const checkTcpPort = (host, port = 80, timeout = 3000) => {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeout);
+
+    socket.connect(port, host, () => {
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.on("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+};
+
+// Enhanced ping with larger payload
+const pingWithLargePayload = async (ip, retries = 3, delay = 1000) => {
+  let successCount = 0;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await ping.promise.probe(ip, { extra: ["-s", "1024"] }); // 1024 bytes payload
+      if (result.alive) successCount++;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    } catch (error) {
+      console.error(`Ping error for ${ip}:`, error);
+    }
+  }
+  return successCount === retries;
+};
+
+// Determine device status with stability checks
+const checkDeviceStatus = async (ip) => {
+  const pingAlive = await pingWithLargePayload(ip);
+  const tcpAlive = pingAlive ? await checkTcpPort(ip) : false;
+  return pingAlive && tcpAlive;
+};
+
+// Main device monitoring loop
+const pingDevices = async () => {
+  const devices = fetchAllIpAddress();
+  flushArpCache(); // Flush ARP cache before pinging
+
+  for (const ip of devices) {
+    const isAlive = await checkDeviceStatus(ip);
+
+    // Get current device status
+    const current = deviceStatus.get(ip) || { status: "Unknown", failCount: 0 };
+
+    if (isAlive) {
+      // Reset fail count on successful response
+      deviceStatus.set(ip, { status: "Online", failCount: 0 });
+    } else {
+      // Increment fail count for each failed attempt
+      const failCount = current.failCount + 1;
+      const newStatus = failCount >= 3 ? "Offline" : "Online"; // Mark offline only after 3 consecutive failures
+      deviceStatus.set(ip, { status: newStatus, failCount });
+    }
+  }
+
+  // Log the updated status
+  const statusObject = Object.fromEntries(
+    Array.from(deviceStatus.entries()).map(([ip, { status }]) => [ip, status])
+  );
+  console.log("Updated device status:", statusObject);
+};
+
+// Endpoint: Ping a single IP dynamically
 app.get("/api/ping/:ip", async (req, res) => {
   const ip = req.params.ip;
-  
+
   try {
-    const result = await ping.promise.probe(ip);
-    res.json({ ip, status: result.alive ? "Online" : "Offline" });
+    const isAlive = await checkDeviceStatus(ip);
+    res.json({ ip, status: isAlive ? "Online" : "Offline" });
   } catch (error) {
     console.error(`Ping error for ${ip}:`, error);
     res.json({ ip, status: "Offline" });
   }
 });
 
-// Function to continuously ping all devices
-const devices = ["10.58.118.20", "10.58.118.21", "10.199.22.61","10.130.36.56","10.64.10.50"]; // Add your device IPs here
-let deviceStatus = {};
-
-async function pingDevices() {
-  for (const ip of devices) {
-    try {
-      const result = await ping.promise.probe(ip);
-      deviceStatus[ip] = result.alive ? "Online" : "Offline";
-    } catch (error) {
-      console.error(`Error pinging ${ip}:`, error);
-      deviceStatus[ip] = "Offline";
-    }
-  }
-  console.log("Updated device status:", deviceStatus);
-}
-
-// Ping devices every 30 seconds
-setInterval(pingDevices, 30000);
-
-// Get real-time status of all devices
+// Endpoint: Retrieve all device statuses
 app.get("/api/devices/status", (req, res) => {
-  res.json(deviceStatus);
+  const statusObj = Object.fromEntries(
+    Array.from(deviceStatus.entries()).map(([ip, { status }]) => [ip, status])
+  );
+  res.json(statusObj);
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).send("Something went wrong!");
+  res.status(500).send("Internal Server Error");
 });
 
-// Start Server
+// Start the server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  pingDevices(); // Start pinging devices immediately
+  console.log(`Server running at http://localhost:${PORT}`);
+  pingDevices(); // Initial device status check
+  setInterval(pingDevices, 120000); // Repeat every 2 minutes
 });
